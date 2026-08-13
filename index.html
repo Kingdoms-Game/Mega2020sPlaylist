@@ -33,6 +33,32 @@
             flex-direction: column;
             gap: 12px;
         }
+        .now-playing-banner {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px 15px;
+            font-size: 14px;
+            color: #ddd;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            box-sizing: border-box;
+        }
+        .now-playing-banner span.label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #888;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .now-playing-banner span.title {
+            font-weight: bold;
+            color: #ff7777;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         #player-container {
             width: 100%;
             aspect-ratio: 16/9;
@@ -73,6 +99,10 @@
             justify-content: space-between;
             align-items: center;
         }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
         button {
             background-color: #ff0000;
             color: white;
@@ -87,6 +117,12 @@
         button:hover {
             background-color: #cc0000;
         }
+        button.secondary {
+            background-color: #333;
+        }
+        button.secondary:hover {
+            background-color: #444;
+        }
         .text-log-section {
             width: 320px;
             background: #1e1e1e;
@@ -96,7 +132,7 @@
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
-            max-height: 540px;
+            max-height: 580px;
         }
         .text-log-section h3 {
             margin-top: 0;
@@ -146,6 +182,11 @@
     <div class="main-layout">
         <!-- Left Column: Player & Controls -->
         <div class="player-section">
+            <div class="now-playing-banner">
+                <span class="label">Now Playing</span>
+                <span id="current-song-title" class="title">Waiting for playback to begin...</span>
+            </div>
+
             <div id="player-container">
                 <div id="youtube-player"></div>
             </div>
@@ -155,7 +196,10 @@
                 <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
                 <div class="button-row">
                     <span id="status-display" class="helper-text">Ready.</span>
-                    <button onclick="initJukebox()">Start Autonomous Jukebox 🔀</button>
+                    <div class="action-buttons">
+                        <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">Skip ⏭️</button>
+                        <button onclick="initJukebox()">Start Jukebox 🔀</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -178,6 +222,7 @@
         let masterTrackPool = [];
         let currentPlaylistIndex = 0;
         let isJukeboxActive = false;
+        let titleInterval = null;
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-player', {
@@ -226,7 +271,6 @@
             loadNextPlaylistForIndexing();
         }
 
-        // Sequentially queue playlists behind the scenes to harvest their video IDs
         function loadNextPlaylistForIndexing() {
             if (currentPlaylistIndex < playlistPool.length) {
                 const targetId = playlistPool[currentPlaylistIndex];
@@ -235,10 +279,8 @@
                     listType: 'playlist',
                     index: 0
                 });
-                // Give the iframe a brief moment to fetch the playlist data array
                 setTimeout(harvestTracksFromCurrentPlayer, 1500);
             } else {
-                // Indexing complete: start true random playback across all harvested tracks
                 if (masterTrackPool.length > 0) {
                     playRandomMasterTrack();
                 } else {
@@ -261,7 +303,6 @@
             if (currentPlaylistIndex < playlistPool.length) {
                 loadNextPlaylistForIndexing();
             } else {
-                // Deduplicate master pool
                 masterTrackPool = [...new Set(masterTrackPool)];
                 renderQueueUI();
                 playRandomMasterTrack();
@@ -271,17 +312,38 @@
         function playRandomMasterTrack() {
             if (!isJukeboxActive || masterTrackPool.length === 0) return;
 
-            // Pick a completely random track from the unified master pool
             const randomIndex = Math.floor(Math.random() * masterTrackPool.length);
             const targetVideoId = masterTrackPool[randomIndex];
 
-            document.getElementById('status-display').innerText = `Playing random mix (${masterTrackPool.length} total tracks indexed)`;
-
+            document.getElementById('status-display').innerText = `Active mix (${masterTrackPool.length} tracks)`;
             player.loadVideoById(targetVideoId);
+
+            // Poll briefly to extract and display the video title once the iframe metadata loads
+            fetchVideoTitle();
+        }
+
+        function fetchVideoTitle() {
+            if (titleInterval) clearInterval(titleInterval);
+            
+            let attempts = 0;
+            titleInterval = setInterval(() => {
+                attempts++;
+                try {
+                    const data = player.getVideoData();
+                    if (data && data.title && data.title !== "") {
+                        document.getElementById('current-song-title').innerText = data.title;
+                        clearInterval(titleInterval);
+                    }
+                } catch (e) {
+                    // Ignore transient cross-frame read exceptions while loading
+                }
+                if (attempts > 20) {
+                    clearInterval(titleInterval);
+                }
+            }, 300);
         }
 
         function onPlayerStateChange(event) {
-            // When any song finishes, immediately pick a new random song from across the entire master pool
             if (event.data === YT.PlayerState.ENDED && isJukeboxActive) {
                 playRandomMasterTrack();
             }
