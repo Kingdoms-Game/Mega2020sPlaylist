@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>True Random Cross-Queue Amalgamator</title>
+    <title>Multi-Playlist Randomizer</title>
     <style>
         body {
             font-family: sans-serif;
@@ -154,13 +154,13 @@
             </div>
 
             <div class="control-panel">
-                <p class="helper-text">Paste YouTube Video URLs (mix links from any number of playlists):</p>
-                <textarea id="playlist-input" placeholder="https://www.youtube.com/watch?v=xxxxx&#10;https://youtu.be/yyyyy&#10;https://www.youtube.com/watch?v=zzzzz"></textarea>
+                <p class="helper-text">Paste YouTube Playlist URLs (one per line):</p>
+                <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
                 <div class="button-row">
                     <span id="status-display" class="helper-text">Ready.</span>
                     <div class="btn-group">
-                        <button class="secondary" onclick="loadQueue(false)">Play in Order</button>
-                        <button onclick="loadQueue(true)">True Shuffle All 🔀</button>
+                        <button class="secondary" onclick="loadPlaylists(false)">Load Playlists</button>
+                        <button onclick="loadPlaylists(true)">Shuffle Across Playlists 🔀</button>
                     </div>
                 </div>
             </div>
@@ -168,65 +168,62 @@
 
         <!-- Right Column: Text Readout Log -->
         <div class="text-log-section">
-            <h3>Active Queue Order</h3>
-            <div id="text-readout">No tracks loaded yet.</div>
+            <h3>Loaded Playlists</h3>
+            <div id="text-readout">No playlists loaded yet.</div>
         </div>
     </div>
 
     <script>
-        function extractVideoId(input) {
+        function extractPlaylistId(input) {
             input = input.trim();
-            // Handle standard watch links, short links, and embed links
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-            const match = input.match(regExp);
-            return (match && match[2].length === 11) ? match[2] : (input.length === 11 ? input : null);
-        }
-
-        function shuffleArray(array) {
-            // Fisher-Yates shuffle algorithm for true random distribution
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
+            if (input.includes('list=')) {
+                try {
+                    const url = new URL(input.startsWith('http') ? input : 'https://www.youtube.com' + input);
+                    return url.searchParams.get('list');
+                } catch (e) {
+                    return null;
+                }
             }
-            return array;
+            return input.length > 5 ? input : null;
         }
 
-        function loadQueue(isShuffled) {
+        function loadPlaylists(isShuffled) {
             const rawText = document.getElementById('playlist-input').value;
             const lines = rawText.split(/[\n,]+/);
-            let videoIds = lines.map(item => extractVideoId(item)).filter(Boolean);
+            let playlistIds = lines.map(item => extractPlaylistId(item)).filter(Boolean);
 
-            // Remove duplicate entries if any
-            videoIds = [...new Set(videoIds)];
+            playlistIds = [...new Set(playlistIds)]; // Remove duplicates
 
-            if (videoIds.length === 0) {
-                alert('Please enter at least one valid YouTube video URL.');
+            if (playlistIds.length === 0) {
+                alert('Please enter at least one valid YouTube playlist URL.');
                 return;
             }
 
             if (isShuffled) {
-                shuffleArray(videoIds);
+                // Shuffle the order of the playlist blocks themselves randomly
+                for (let i = playlistIds.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [playlistIds[i], playlistIds[j]] = [playlistIds[j], playlistIds[i]];
+                }
             }
 
             const currentOrigin = window.location.origin === 'file://' ? '*' : window.location.origin;
             
-            // YouTube embeds accept a comma-separated list of video IDs to form a custom queue
-            const firstVideo = videoIds[0];
-            const remainingVideos = videoIds.slice(1).join(',');
+            // Load the first playlist, appending shuffle parameter if requested
+            const primaryList = playlistIds[0];
+            let embedUrl = `https://www.youtube-nocookie.com/embed/videoseries?list=${primaryList}&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(currentOrigin)}`;
             
-            let embedUrl = `https://www.youtube-nocookie.com/embed/${firstVideo}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(currentOrigin)}`;
-            
-            if (remainingVideos.length > 0) {
-                embedUrl += `&playlist=${remainingVideos}`;
+            if (isShuffled) {
+                embedUrl += `&shuffle=1`;
             }
 
             document.getElementById('youtube-iframe').src = embedUrl;
-            document.getElementById('status-display').innerText = isShuffled ? `Playing Shuffled Mix (${videoIds.length} tracks)` : `Playing In Order (${videoIds.length} tracks)`;
+            document.getElementById('status-display').innerText = isShuffled ? `Active Mix (${playlistIds.length} playlists randomized)` : `Active Playlist Loaded`;
 
-            // Update the sidebar text log to show the exact randomized order
-            let logHtml = `<strong>Total Tracks:</strong> ${videoIds.length}<br><br><strong>Queue Sequence:</strong><br><ol style="padding-left: 20px; margin: 5px 0;">`;
-            videoIds.forEach((id, index) => {
-                logHtml += `<li><a href="https://youtu.be/${id}" target="_blank" style="color: #ff7777;">${id}</a></li>`;
+            // Update sidebar log
+            let logHtml = `<strong>Playlists Queued:</strong> ${playlistIds.length}<br><br><ol style="padding-left: 20px; margin: 5px 0;">`;
+            playlistIds.forEach((id, index) => {
+                logHtml += `<li><a href="https://www.youtube.com/playlist?list=${id}" target="_blank" style="color: #ff7777;">${id}</a></li>`;
             });
             logHtml += `</ol>`;
             
