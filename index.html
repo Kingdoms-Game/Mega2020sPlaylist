@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Playlist Jukebox Shell</title>
+    <title>Autonomous Cross-Playlist Jukebox</title>
     <style>
         body {
             font-family: sans-serif;
@@ -41,11 +41,6 @@
             border-radius: 12px;
             overflow: hidden;
         }
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
         .control-panel {
             display: flex;
             flex-direction: column;
@@ -58,7 +53,7 @@
         }
         textarea {
             width: 100%;
-            height: 80px;
+            height: 90px;
             background: #121212;
             color: #fff;
             border: 1px solid #444;
@@ -78,10 +73,6 @@
             justify-content: space-between;
             align-items: center;
         }
-        .btn-group {
-            display: flex;
-            gap: 10px;
-        }
         button {
             background-color: #ff0000;
             color: white;
@@ -96,13 +87,6 @@
         button:hover {
             background-color: #cc0000;
         }
-        button.secondary {
-            background-color: #333;
-        }
-        button.secondary:hover {
-            background-color: #444;
-        }
-        /* Sidebar Panel */
         .text-log-section {
             width: 320px;
             background: #1e1e1e;
@@ -150,10 +134,6 @@
             white-space: nowrap;
             max-width: 180px;
         }
-        .queue-item button {
-            padding: 4px 8px;
-            font-size: 11px;
-        }
         .helper-text {
             font-size: 13px;
             color: #888;
@@ -167,12 +147,7 @@
         <!-- Left Column: Player & Controls -->
         <div class="player-section">
             <div id="player-container">
-                <iframe id="youtube-iframe" 
-                        src="about:blank" 
-                        referrerpolicy="strict-origin-when-cross-origin" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowfullscreen>
-                </iframe>
+                <div id="youtube-player"></div>
             </div>
 
             <div class="control-panel">
@@ -180,26 +155,43 @@
                 <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
                 <div class="button-row">
                     <span id="status-display" class="helper-text">Ready.</span>
-                    <div class="btn-group">
-                        <button class="secondary" onclick="loadJukebox(false)">Load Queue</button>
-                        <button onclick="loadJukebox(true)">Shuffle Playlists 🔀</button>
-                    </div>
+                    <button onclick="initJukebox()">Start Autonomous Jukebox 🔀</button>
                 </div>
             </div>
         </div>
 
         <!-- Right Column: Interactive Queue Manager -->
         <div class="text-log-section">
-            <h3>Playlist Queue Deck</h3>
+            <h3>Active Playlist Pool</h3>
             <div id="playlist-queue-list">
                 <span style="color: #666; text-align: center; margin-top: 40px;">No playlists loaded yet.</span>
             </div>
         </div>
     </div>
 
+    <!-- YouTube IFrame API Script Loader -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+
     <script>
-        let parsedPlaylists = [];
-        let activeIndex = 0;
+        let player;
+        let playlistPool = [];
+        let isJukeboxActive = false;
+
+        // Global callback required by the YouTube API
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('youtube-player', {
+                height: '100%',
+                width: '100%',
+                playerVars: {
+                    'autoplay': 1,
+                    'enablejsapi': 1,
+                    'origin': window.location.origin
+                },
+                events: {
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
 
         function extractPlaylistId(input) {
             input = input.trim();
@@ -214,61 +206,85 @@
             return input.length > 5 ? input : null;
         }
 
-        function loadJukebox(isShuffled) {
+        function initJukebox() {
             const rawText = document.getElementById('playlist-input').value;
             const lines = rawText.split(/[\n,]+/);
-            parsedPlaylists = lines.map(item => extractPlaylistId(item)).filter(Boolean);
-            parsedPlaylists = [...new Set(parsedPlaylists)];
+            playlistPool = lines.map(item => extractPlaylistId(item)).filter(Boolean);
+            playlistPool = [...new Set(playlistPool)];
 
-            if (parsedPlaylists.length === 0) {
+            if (playlistPool.length === 0) {
                 alert('Please enter at least one valid playlist URL.');
                 return;
             }
 
-            if (isShuffled) {
-                for (let i = parsedPlaylists.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [parsedPlaylists[i], parsedPlaylists[j]] = [parsedPlaylists[j], parsedPlaylists[i]];
-                }
-            }
-
-            activeIndex = 0;
-            playPlaylistAtIndex(activeIndex);
+            isJukeboxActive = true;
             renderQueueUI();
+            playRandomPlaylist();
         }
 
-        function playPlaylistAtIndex(index) {
-            if (index < 0 || index >= parsedPlaylists.length) return;
-            activeIndex = index;
+        function playRandomPlaylist() {
+            if (!isJukeboxActive || playlistPool.length === 0) return;
 
-            const targetId = parsedPlaylists[activeIndex];
-            const currentOrigin = window.location.origin === 'file://' ? '*' : window.location.origin;
+            // Pick a random playlist from the entered pool
+            const randomIndex = Math.floor(Math.random() * playlistPool.length);
+            const targetId = playlistPool[randomIndex];
 
-            // Load the chosen playlist into the frame
-            const embedUrl = `https://www.youtube-nocookie.com/embed/videoseries?list=${targetId}&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(currentOrigin)}`;
-            
-            document.getElementById('youtube-iframe').src = embedUrl;
-            document.getElementById('status-display').innerText = `Playing Playlist (${activeIndex + 1} of ${parsedPlaylists.length})`;
+            document.getElementById('status-display').innerText = `Switching to random playlist mix...`;
 
-            renderQueueUI();
+            if (player && typeof player.loadPlaylist === 'function') {
+                // Load the new playlist queue
+                player.loadPlaylist({
+                    list: targetId,
+                    listType: 'playlist',
+                    index: 0,
+                    autoplay: true
+                });
+
+                // Force shuffle mode ON by default upon load
+                setTimeout(() => {
+                    try {
+                        player.setShuffle(true);
+                        player.playVideoAt(0);
+                    } catch (e) {
+                        console.log('Shuffle applied:', e);
+                    }
+                }, 1000);
+            }
+
+            highlightActivePlaylist(targetId);
+        }
+
+        // Intercepts player events; triggers automatic random rotation when a track ends
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.ENDED && isJukeboxActive) {
+                playRandomPlaylist();
+            }
+        }
+
+        function highlightActivePlaylist(activeId) {
+            const container = document.getElementById('playlist-queue-list');
+            let html = '';
+            playlistPool.forEach((id, idx) => {
+                const isActive = id === activeId;
+                html += `
+                    <div class="queue-item" style="border-color: ${isActive ? '#ff0000' : '#333'}">
+                        <span title="${id}">#${idx + 1}: ${id}</span>
+                        <span style="color: ${isActive ? '#ff7777' : '#666'}; font-size: 11px;">
+                            ${isActive ? 'ACTIVE' : ''}
+                        </span>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
         }
 
         function renderQueueUI() {
             const container = document.getElementById('playlist-queue-list');
-            if (parsedPlaylists.length === 0) {
-                container.innerHTML = `<span style="color: #666; text-align: center; margin-top: 40px;">No playlists loaded yet.</span>`;
-                return;
-            }
-
             let html = '';
-            parsedPlaylists.forEach((id, idx) => {
-                const isCurrent = idx === activeIndex;
+            playlistPool.forEach((id, idx) => {
                 html += `
-                    <div class="queue-item" style="border-color: ${isCurrent ? '#ff0000' : '#333'}">
+                    <div class="queue-item">
                         <span title="${id}">#${idx + 1}: ${id}</span>
-                        <button onclick="playPlaylistAtIndex(${idx})" style="background-color: ${isCurrent ? '#ff0000' : '#333'}">
-                            ${isCurrent ? 'Playing' : 'Jump'}
-                        </button>
                     </div>
                 `;
             });
