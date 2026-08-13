@@ -162,7 +162,7 @@
 
         <!-- Right Column: Interactive Queue Manager -->
         <div class="text-log-section">
-            <h3>Active Playlist Pool</h3>
+            <h3>Playlist Pool Status</h3>
             <div id="playlist-queue-list">
                 <span style="color: #666; text-align: center; margin-top: 40px;">No playlists loaded yet.</span>
             </div>
@@ -175,9 +175,10 @@
     <script>
         let player;
         let playlistPool = [];
+        let masterTrackPool = [];
+        let currentPlaylistIndex = 0;
         let isJukeboxActive = false;
 
-        // Global callback required by the YouTube API
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-player', {
                 height: '100%',
@@ -218,69 +219,78 @@
             }
 
             isJukeboxActive = true;
-            renderQueueUI();
-            playRandomPlaylist();
+            masterTrackPool = [];
+            currentPlaylistIndex = 0;
+            
+            document.getElementById('status-display').innerText = `Indexing playlists...`;
+            loadNextPlaylistForIndexing();
         }
 
-        function playRandomPlaylist() {
-            if (!isJukeboxActive || playlistPool.length === 0) return;
-
-            // Pick a random playlist from the entered pool
-            const randomIndex = Math.floor(Math.random() * playlistPool.length);
-            const targetId = playlistPool[randomIndex];
-
-            document.getElementById('status-display').innerText = `Switching to random playlist mix...`;
-
-            if (player && typeof player.loadPlaylist === 'function') {
-                // Load the new playlist queue
+        // Sequentially queue playlists behind the scenes to harvest their video IDs
+        function loadNextPlaylistForIndexing() {
+            if (currentPlaylistIndex < playlistPool.length) {
+                const targetId = playlistPool[currentPlaylistIndex];
                 player.loadPlaylist({
                     list: targetId,
                     listType: 'playlist',
-                    index: 0,
-                    autoplay: true
+                    index: 0
                 });
-
-                // Force shuffle mode ON by default upon load
-                setTimeout(() => {
-                    try {
-                        player.setShuffle(true);
-                        player.playVideoAt(0);
-                    } catch (e) {
-                        console.log('Shuffle applied:', e);
-                    }
-                }, 1000);
+                // Give the iframe a brief moment to fetch the playlist data array
+                setTimeout(harvestTracksFromCurrentPlayer, 1500);
+            } else {
+                // Indexing complete: start true random playback across all harvested tracks
+                if (masterTrackPool.length > 0) {
+                    playRandomMasterTrack();
+                } else {
+                    alert('Could not index tracks. Make sure the playlist links are public.');
+                }
             }
-
-            highlightActivePlaylist(targetId);
         }
 
-        // Intercepts player events; triggers automatic random rotation when a track ends
+        function harvestTracksFromCurrentPlayer() {
+            try {
+                const fetchedTracks = player.getPlaylist();
+                if (fetchedTracks && Array.isArray(fetchedTracks)) {
+                    masterTrackPool.push(...fetchedTracks);
+                }
+            } catch (e) {
+                console.log('Error harvesting playlist:', e);
+            }
+
+            currentPlaylistIndex++;
+            if (currentPlaylistIndex < playlistPool.length) {
+                loadNextPlaylistForIndexing();
+            } else {
+                // Deduplicate master pool
+                masterTrackPool = [...new Set(masterTrackPool)];
+                renderQueueUI();
+                playRandomMasterTrack();
+            }
+        }
+
+        function playRandomMasterTrack() {
+            if (!isJukeboxActive || masterTrackPool.length === 0) return;
+
+            // Pick a completely random track from the unified master pool
+            const randomIndex = Math.floor(Math.random() * masterTrackPool.length);
+            const targetVideoId = masterTrackPool[randomIndex];
+
+            document.getElementById('status-display').innerText = `Playing random mix (${masterTrackPool.length} total tracks indexed)`;
+
+            player.loadVideoById(targetVideoId);
+        }
+
         function onPlayerStateChange(event) {
+            // When any song finishes, immediately pick a new random song from across the entire master pool
             if (event.data === YT.PlayerState.ENDED && isJukeboxActive) {
-                playRandomPlaylist();
+                playRandomMasterTrack();
             }
-        }
-
-        function highlightActivePlaylist(activeId) {
-            const container = document.getElementById('playlist-queue-list');
-            let html = '';
-            playlistPool.forEach((id, idx) => {
-                const isActive = id === activeId;
-                html += `
-                    <div class="queue-item" style="border-color: ${isActive ? '#ff0000' : '#333'}">
-                        <span title="${id}">#${idx + 1}: ${id}</span>
-                        <span style="color: ${isActive ? '#ff7777' : '#666'}; font-size: 11px;">
-                            ${isActive ? 'ACTIVE' : ''}
-                        </span>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
         }
 
         function renderQueueUI() {
             const container = document.getElementById('playlist-queue-list');
-            let html = '';
+            let html = `<strong>Indexed Playlists:</strong> ${playlistPool.length}<br><strong>Total Songs Found:</strong> ${masterTrackPool.length}<br><hr style="border-color:#333; margin:8px 0;">`;
+            
             playlistPool.forEach((id, idx) => {
                 html += `
                     <div class="queue-item">
