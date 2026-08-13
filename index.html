@@ -41,9 +41,17 @@
             font-size: 14px;
             color: #ddd;
             display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        .now-playing-info {
+            display: flex;
             flex-direction: column;
             gap: 4px;
-            box-sizing: border-box;
+            overflow: hidden;
+            flex: 1;
+            margin-right: 15px;
         }
         .now-playing-banner span.label {
             font-size: 11px;
@@ -68,7 +76,6 @@
             overflow: hidden;
             position: relative;
         }
-        /* Silent Loading Overlay Screen */
         #loading-overlay {
             position: absolute;
             top: 0;
@@ -137,10 +144,6 @@
             justify-content: space-between;
             align-items: center;
         }
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-        }
         button {
             background-color: #ff0000;
             color: white;
@@ -157,6 +160,8 @@
         }
         button.secondary {
             background-color: #333;
+            padding: 8px 14px;
+            font-size: 13px;
         }
         button.secondary:hover {
             background-color: #444;
@@ -221,12 +226,14 @@
         <!-- Left Column: Player & Controls -->
         <div class="player-section">
             <div class="now-playing-banner">
-                <span class="label">Now Playing</span>
-                <span id="current-song-title" class="title">Waiting for playback to begin...</span>
+                <div class="now-playing-info">
+                    <span class="label">Now Playing</span>
+                    <span id="current-song-title" class="title">Waiting for playback to begin...</span>
+                </div>
+                <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">Skip ⏭️</button>
             </div>
 
             <div id="player-container">
-                <!-- Silent Loading Overlay -->
                 <div id="loading-overlay" class="hidden">
                     <div class="spinner"></div>
                     <span id="overlay-status" class="loading-text">Indexing playlists...</span>
@@ -239,10 +246,7 @@
                 <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
                 <div class="button-row">
                     <span id="status-display" class="helper-text">Ready.</span>
-                    <div class="action-buttons">
-                        <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">Skip ⏭️</button>
-                        <button onclick="initJukebox()">Start Jukebox 🔀</button>
-                    </div>
+                    <button onclick="initJukebox()">Start Jukebox 🔀</button>
                 </div>
             </div>
         </div>
@@ -310,7 +314,11 @@
             masterTrackPool = [];
             currentPlaylistIndex = 0;
             
-            // Show the silent loading overlay screen
+            // Mute the player globally during the hidden indexing phase
+            if (player && typeof player.mute === 'function') {
+                player.mute();
+            }
+
             const overlay = document.getElementById('loading-overlay');
             overlay.classList.remove('hidden');
             document.getElementById('overlay-status').innerText = `Indexing playlist 1 of ${playlistPool.length}...`;
@@ -330,14 +338,7 @@
                 });
                 setTimeout(harvestTracksFromCurrentPlayer, 1500);
             } else {
-                if (masterTrackPool.length > 0) {
-                    // Hide the loading overlay before starting playback
-                    document.getElementById('loading-overlay').classList.add('hidden');
-                    playRandomMasterTrack();
-                } else {
-                    document.getElementById('loading-overlay').classList.add('hidden');
-                    alert('Could not index tracks. Make sure the playlist links are public.');
-                }
+                FINALIZE_INDEXING();
             }
         }
 
@@ -355,10 +356,25 @@
             if (currentPlaylistIndex < playlistPool.length) {
                 loadNextPlaylistForIndexing();
             } else {
-                masterTrackPool = [...new Set(masterTrackPool)];
-                renderQueueUI();
-                document.getElementById('loading-overlay').classList.add('hidden');
+                FINALIZE_INDEXING();
+            }
+        }
+
+        function FINALIZE_INDEXING() {
+            masterTrackPool = [...new Set(masterTrackPool)];
+            renderQueueUI();
+            
+            // Unmute the player before launching the first active track
+            if (player && typeof player.unMute === 'function') {
+                player.unMute();
+            }
+
+            document.getElementById('loading-overlay').classList.add('hidden');
+            
+            if (masterTrackPool.length > 0) {
                 playRandomMasterTrack();
+            } else {
+                alert('Could not index tracks. Make sure the playlist links are public.');
             }
         }
 
