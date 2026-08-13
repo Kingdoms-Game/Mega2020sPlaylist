@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Playlist Randomizer</title>
+    <title>Multi-Playlist Jukebox</title>
     <style>
         body {
             font-family: sans-serif;
@@ -58,7 +58,7 @@
         }
         textarea {
             width: 100%;
-            height: 100px;
+            height: 90px;
             background: #121212;
             color: #fff;
             border: 1px solid #444;
@@ -78,10 +78,6 @@
             justify-content: space-between;
             align-items: center;
         }
-        .btn-group {
-            display: flex;
-            gap: 10px;
-        }
         button {
             background-color: #ff0000;
             color: white;
@@ -96,12 +92,6 @@
         button:hover {
             background-color: #cc0000;
         }
-        button.secondary {
-            background-color: #333;
-        }
-        button.secondary:hover {
-            background-color: #444;
-        }
         .text-log-section {
             width: 300px;
             background: #1e1e1e;
@@ -111,7 +101,7 @@
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
-            max-height: 550px;
+            max-height: 520px;
         }
         .text-log-section h3 {
             margin-top: 0;
@@ -154,26 +144,26 @@
             </div>
 
             <div class="control-panel">
-                <p class="helper-text">Paste YouTube Playlist URLs (one per line):</p>
+                <p class="helper-text">Paste your target Playlist URLs (one per line):</p>
                 <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
                 <div class="button-row">
                     <span id="status-display" class="helper-text">Ready.</span>
-                    <div class="btn-group">
-                        <button class="secondary" onclick="loadPlaylists(false)">Load Playlists</button>
-                        <button onclick="loadPlaylists(true)">Shuffle Across Playlists 🔀</button>
-                    </div>
+                    <button onclick="startJukebox()">Start Playlist Jukebox 🔀</button>
                 </div>
             </div>
         </div>
 
-        <!-- Right Column: Text Readout Log -->
+        <!-- Right Column: Readout Log -->
         <div class="text-log-section">
-            <h3>Loaded Playlists</h3>
-            <div id="text-readout">No playlists loaded yet.</div>
+            <h3>Jukebox Status</h3>
+            <div id="text-readout">Waiting for input...</div>
         </div>
     </div>
 
     <script>
+        let playlistQueue = [];
+        let currentIndex = 0;
+
         function extractPlaylistId(input) {
             input = input.trim();
             if (input.includes('list=')) {
@@ -187,47 +177,51 @@
             return input.length > 5 ? input : null;
         }
 
-        function loadPlaylists(isShuffled) {
+        function startJukebox() {
             const rawText = document.getElementById('playlist-input').value;
             const lines = rawText.split(/[\n,]+/);
-            let playlistIds = lines.map(item => extractPlaylistId(item)).filter(Boolean);
+            playlistQueue = lines.map(item => extractPlaylistId(item)).filter(Boolean);
+            playlistQueue = [...new Set(playlistQueue)];
 
-            playlistIds = [...new Set(playlistIds)]; // Remove duplicates
-
-            if (playlistIds.length === 0) {
-                alert('Please enter at least one valid YouTube playlist URL.');
+            if (playlistQueue.length === 0) {
+                alert('Please enter at least one valid playlist URL.');
                 return;
             }
 
-            if (isShuffled) {
-                // Shuffle the order of the playlist blocks themselves randomly
-                for (let i = playlistIds.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [playlistIds[i], playlistIds[j]] = [playlistIds[j], playlistIds[i]];
-                }
+            // Shuffle the playlist rotation order randomly
+            for (let i = playlistQueue.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [playlistQueue[i], playlistQueue[j]] = [playlistQueue[j], playlistQueue[i]];
             }
 
+            currentIndex = 0;
+            playCurrentPlaylist();
+        }
+
+        function playCurrentPlaylist() {
+            if (currentIndex >= playlistQueue.length) {
+                // Loop back to the beginning of the shuffled playlist rotation
+                currentIndex = 0;
+            }
+
+            const currentId = playlistQueue[currentIndex];
             const currentOrigin = window.location.origin === 'file://' ? '*' : window.location.origin;
-            
-            // Load the first playlist, appending shuffle parameter if requested
-            const primaryList = playlistIds[0];
-            let embedUrl = `https://www.youtube-nocookie.com/embed/videoseries?list=${primaryList}&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(currentOrigin)}`;
-            
-            if (isShuffled) {
-                embedUrl += `&shuffle=1`;
-            }
 
+            // Load a single playlist with built-in native shuffle enabled for that specific batch
+            const embedUrl = `https://www.youtube-nocookie.com/embed/videoseries?list=${currentId}&autoplay=1&shuffle=1&enablejsapi=1&origin=${encodeURIComponent(currentOrigin)}`;
+            
             document.getElementById('youtube-iframe').src = embedUrl;
-            document.getElementById('status-display').innerText = isShuffled ? `Active Mix (${playlistIds.length} playlists randomized)` : `Active Playlist Loaded`;
+            document.getElementById('status-display').innerText = `Rotating to Playlist ${currentIndex + 1} of ${playlistQueue.length}`;
 
-            // Update sidebar log
-            let logHtml = `<strong>Playlists Queued:</strong> ${playlistIds.length}<br><br><ol style="padding-left: 20px; margin: 5px 0;">`;
-            playlistIds.forEach((id, index) => {
-                logHtml += `<li><a href="https://www.youtube.com/playlist?list=${id}" target="_blank" style="color: #ff7777;">${id}</a></li>`;
-            });
-            logHtml += `</ol>`;
-            
-            document.getElementById('text-readout').innerHTML = logHtml;
+            // Update Sidebar Readout
+            document.getElementById('text-readout').innerHTML = `
+                <strong>Active Rotation Index:</strong> ${currentIndex + 1} / ${playlistQueue.length}<br><br>
+                <strong>Current Playlist ID:</strong><br><a href="https://www.youtube.com/playlist?list=${currentId}" target="_blank" style="color: #ff7777;">${currentId}</a><br><br>
+                <em>Note: This batch will shuffle internally, then hand off to the next playlist in your pool when finished.</em>
+            `;
+
+            // Increment for the next rotation cycle
+            currentIndex++;
         }
     </script>
 
