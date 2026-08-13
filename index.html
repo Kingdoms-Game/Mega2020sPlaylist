@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Playlist Jukebox</title>
+    <title>Playlist Jukebox Shell</title>
     <style>
         body {
             font-family: sans-serif;
@@ -58,7 +58,7 @@
         }
         textarea {
             width: 100%;
-            height: 90px;
+            height: 80px;
             background: #121212;
             color: #fff;
             border: 1px solid #444;
@@ -78,6 +78,10 @@
             justify-content: space-between;
             align-items: center;
         }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
         button {
             background-color: #ff0000;
             color: white;
@@ -92,8 +96,15 @@
         button:hover {
             background-color: #cc0000;
         }
+        button.secondary {
+            background-color: #333;
+        }
+        button.secondary:hover {
+            background-color: #444;
+        }
+        /* Sidebar Panel */
         .text-log-section {
-            width: 300px;
+            width: 320px;
             background: #1e1e1e;
             border: 1px solid #333;
             border-radius: 12px;
@@ -101,7 +112,7 @@
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
-            max-height: 520px;
+            max-height: 540px;
         }
         .text-log-section h3 {
             margin-top: 0;
@@ -110,7 +121,7 @@
             border-bottom: 1px solid #333;
             padding-bottom: 8px;
         }
-        #text-readout {
+        #playlist-queue-list {
             flex: 1;
             background: #121212;
             border: 1px solid #333;
@@ -120,7 +131,28 @@
             font-family: monospace;
             font-size: 12px;
             color: #ccc;
-            word-break: break-all;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .queue-item {
+            background: #1a1a1a;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .queue-item span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 180px;
+        }
+        .queue-item button {
+            padding: 4px 8px;
+            font-size: 11px;
         }
         .helper-text {
             font-size: 13px;
@@ -144,25 +176,30 @@
             </div>
 
             <div class="control-panel">
-                <p class="helper-text">Paste your target Playlist URLs (one per line):</p>
+                <p class="helper-text">Paste your Playlist URLs (one per line):</p>
                 <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
                 <div class="button-row">
                     <span id="status-display" class="helper-text">Ready.</span>
-                    <button onclick="startJukebox()">Start Playlist Jukebox 🔀</button>
+                    <div class="btn-group">
+                        <button class="secondary" onclick="loadJukebox(false)">Load Queue</button>
+                        <button onclick="loadJukebox(true)">Shuffle Playlists 🔀</button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right Column: Readout Log -->
+        <!-- Right Column: Interactive Queue Manager -->
         <div class="text-log-section">
-            <h3>Jukebox Status</h3>
-            <div id="text-readout">Waiting for input...</div>
+            <h3>Playlist Queue Deck</h3>
+            <div id="playlist-queue-list">
+                <span style="color: #666; text-align: center; margin-top: 40px;">No playlists loaded yet.</span>
+            </div>
         </div>
     </div>
 
     <script>
-        let playlistQueue = [];
-        let currentIndex = 0;
+        let parsedPlaylists = [];
+        let activeIndex = 0;
 
         function extractPlaylistId(input) {
             input = input.trim();
@@ -177,51 +214,65 @@
             return input.length > 5 ? input : null;
         }
 
-        function startJukebox() {
+        function loadJukebox(isShuffled) {
             const rawText = document.getElementById('playlist-input').value;
             const lines = rawText.split(/[\n,]+/);
-            playlistQueue = lines.map(item => extractPlaylistId(item)).filter(Boolean);
-            playlistQueue = [...new Set(playlistQueue)];
+            parsedPlaylists = lines.map(item => extractPlaylistId(item)).filter(Boolean);
+            parsedPlaylists = [...new Set(parsedPlaylists)];
 
-            if (playlistQueue.length === 0) {
+            if (parsedPlaylists.length === 0) {
                 alert('Please enter at least one valid playlist URL.');
                 return;
             }
 
-            // Shuffle the playlist rotation order randomly
-            for (let i = playlistQueue.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [playlistQueue[i], playlistQueue[j]] = [playlistQueue[j], playlistQueue[i]];
+            if (isShuffled) {
+                for (let i = parsedPlaylists.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [parsedPlaylists[i], parsedPlaylists[j]] = [parsedPlaylists[j], parsedPlaylists[i]];
+                }
             }
 
-            currentIndex = 0;
-            playCurrentPlaylist();
+            activeIndex = 0;
+            playPlaylistAtIndex(activeIndex);
+            renderQueueUI();
         }
 
-        function playCurrentPlaylist() {
-            if (currentIndex >= playlistQueue.length) {
-                // Loop back to the beginning of the shuffled playlist rotation
-                currentIndex = 0;
-            }
+        function playPlaylistAtIndex(index) {
+            if (index < 0 || index >= parsedPlaylists.length) return;
+            activeIndex = index;
 
-            const currentId = playlistQueue[currentIndex];
+            const targetId = parsedPlaylists[activeIndex];
             const currentOrigin = window.location.origin === 'file://' ? '*' : window.location.origin;
 
-            // Load a single playlist with built-in native shuffle enabled for that specific batch
-            const embedUrl = `https://www.youtube-nocookie.com/embed/videoseries?list=${currentId}&autoplay=1&shuffle=1&enablejsapi=1&origin=${encodeURIComponent(currentOrigin)}`;
+            // Load the chosen playlist into the frame
+            const embedUrl = `https://www.youtube-nocookie.com/embed/videoseries?list=${targetId}&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(currentOrigin)}`;
             
             document.getElementById('youtube-iframe').src = embedUrl;
-            document.getElementById('status-display').innerText = `Rotating to Playlist ${currentIndex + 1} of ${playlistQueue.length}`;
+            document.getElementById('status-display').innerText = `Playing Playlist (${activeIndex + 1} of ${parsedPlaylists.length})`;
 
-            // Update Sidebar Readout
-            document.getElementById('text-readout').innerHTML = `
-                <strong>Active Rotation Index:</strong> ${currentIndex + 1} / ${playlistQueue.length}<br><br>
-                <strong>Current Playlist ID:</strong><br><a href="https://www.youtube.com/playlist?list=${currentId}" target="_blank" style="color: #ff7777;">${currentId}</a><br><br>
-                <em>Note: This batch will shuffle internally, then hand off to the next playlist in your pool when finished.</em>
-            `;
+            renderQueueUI();
+        }
 
-            // Increment for the next rotation cycle
-            currentIndex++;
+        function renderQueueUI() {
+            const container = document.getElementById('playlist-queue-list');
+            if (parsedPlaylists.length === 0) {
+                container.innerHTML = `<span style="color: #666; text-align: center; margin-top: 40px;">No playlists loaded yet.</span>`;
+                return;
+            }
+
+            let html = '';
+            parsedPlaylists.forEach((id, idx) => {
+                const isCurrent = idx === activeIndex;
+                html += `
+                    <div class="queue-item" style="border-color: ${isCurrent ? '#ff0000' : '#333'}">
+                        <span title="${id}">#${idx + 1}: ${id}</span>
+                        <button onclick="playPlaylistAtIndex(${idx})" style="background-color: ${isCurrent ? '#ff0000' : '#333'}">
+                            ${isCurrent ? 'Playing' : 'Jump'}
+                        </button>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
         }
     </script>
 
