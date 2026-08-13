@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Robust Playlist Amalgamator</title>
+    <title>Amalgamated Playlist Shell</title>
     <style>
         body {
             font-family: sans-serif;
@@ -18,15 +18,28 @@
             padding: 20px;
             box-sizing: border-box;
         }
-        #player-container {
-            width: 850px;
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            width: 1200px;
             max-width: 100%;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .player-section {
+            flex: 1;
+            min-width: 700px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        #player-container {
+            width: 100%;
             aspect-ratio: 16/9;
             background: #000;
             box-shadow: 0 8px 24px rgba(0,0,0,0.6);
             border-radius: 12px;
             overflow: hidden;
-            margin-bottom: 20px;
         }
         iframe {
             width: 100%;
@@ -34,27 +47,25 @@
             border: none;
         }
         .control-panel {
-            width: 850px;
-            max-width: 100%;
             display: flex;
             flex-direction: column;
             gap: 12px;
             background: #1e1e1e;
             padding: 20px;
             border-radius: 12px;
-            box-sizing: border-box;
             border: 1px solid #333;
+            box-sizing: border-box;
         }
         textarea {
             width: 100%;
-            height: 80px;
+            height: 70px;
             background: #121212;
             color: #fff;
             border: 1px solid #444;
             border-radius: 6px;
-            padding: 12px;
+            padding: 10px;
             font-family: monospace;
-            font-size: 14px;
+            font-size: 13px;
             resize: vertical;
             box-sizing: border-box;
         }
@@ -67,12 +78,16 @@
             justify-content: space-between;
             align-items: center;
         }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
         button {
             background-color: #ff0000;
             color: white;
             border: none;
-            padding: 10px 24px;
-            font-size: 15px;
+            padding: 10px 18px;
+            font-size: 14px;
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
@@ -80,6 +95,43 @@
         }
         button:hover {
             background-color: #cc0000;
+        }
+        button.secondary {
+            background-color: #333;
+        }
+        button.secondary:hover {
+            background-color: #444;
+        }
+        /* Text Readout Sidebar */
+        .text-log-section {
+            width: 300px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            max-height: 520px;
+        }
+        .text-log-section h3 {
+            margin-top: 0;
+            font-size: 15px;
+            color: #aaa;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+        #text-readout {
+            flex: 1;
+            background: #121212;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 10px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            color: #ccc;
+            word-break: break-all;
         }
         .helper-text {
             font-size: 13px;
@@ -90,16 +142,35 @@
 </head>
 <body>
 
-    <div id="player-container">
-        <iframe id="youtube-iframe" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-    </div>
+    <div class="main-layout">
+        <!-- Left Column: Player & Controls -->
+        <div class="player-section">
+            <div id="player-container">
+                <iframe id="youtube-iframe" 
+                        src="about:blank" 
+                        referrerpolicy="strict-origin-when-cross-origin" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen>
+                </iframe>
+            </div>
 
-    <div class="control-panel">
-        <p class="helper-text">Paste a YouTube Playlist URL below:</p>
-        <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx..."></textarea>
-        <div class="button-row">
-            <span id="status-display" class="helper-text">Ready.</span>
-            <button onclick="loadPlaylistDirectly()">Load Playlist</button>
+            <div class="control-panel">
+                <p class="helper-text">Paste YouTube Playlist URL:</p>
+                <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx..."></textarea>
+                <div class="button-row">
+                    <span id="status-display" class="helper-text">Ready.</span>
+                    <div class="btn-group">
+                        <button class="secondary" onclick="loadPlaylistDirectly(false)">Load Normal</button>
+                        <button onclick="loadPlaylistDirectly(true)">Load Shuffled 🔀</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Basic Text-Link Readout Log -->
+        <div class="text-log-section">
+            <h3>Playlist Log & Links</h3>
+            <div id="text-readout">No active queue data parsed yet. Paste a link and load to log details here.</div>
         </div>
     </div>
 
@@ -117,7 +188,7 @@
             return input.length > 5 ? input : null;
         }
 
-        function loadPlaylistDirectly() {
+        function loadPlaylistDirectly(isShuffled) {
             const rawText = document.getElementById('playlist-input').value;
             const playlistId = extractPlaylistId(rawText);
 
@@ -126,11 +197,25 @@
                 return;
             }
 
-            // Construct the direct embed URL syntax that YouTube natively accepts without silent drops
-            const embedUrl = `https://www.youtube.com/embed/videoseries?list=${playlistId}&autoplay=1`;
+            const currentOrigin = window.location.origin === 'file://' ? '*' : window.location.origin;
+            
+            // Embed parameters: shuffle=1 randomizes playback order natively via YouTube's engine
+            let embedUrl = `https://www.youtube-nocookie.com/embed/videoseries?list=${playlistId}&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(currentOrigin)}`;
+            
+            if (isShuffled) {
+                embedUrl += `&shuffle=1`;
+            }
             
             document.getElementById('youtube-iframe').src = embedUrl;
-            document.getElementById('status-display').innerText = `Loaded playlist: ${playlistId}`;
+            document.getElementById('status-display').innerText = isShuffled ? 'Loaded (Shuffled Mode)' : 'Loaded (Standard Mode)';
+
+            // Populate the basic text readout panel with data tracking info
+            const readoutBox = document.getElementById('text-readout');
+            readoutBox.innerHTML = `
+                <strong>Active Playlist ID:</strong><br>${playlistId}<br><br>
+                <strong>Direct Source URL:</strong><br><a href="https://www.youtube.com/playlist?list=${playlistId}" target="_blank" style="color: #ff7777;">Open on YouTube</a><br><br>
+                <strong>Mode:</strong> ${isShuffled ? 'Shuffled' : 'Sequential'}
+            `;
         }
     </script>
 
