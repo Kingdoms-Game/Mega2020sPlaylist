@@ -200,7 +200,7 @@
         }
         button {
             background-color: #2ecc71;
-            color: white;
+            color: black;
             border: none;
             padding: 10px 18px;
             font-size: 14px;
@@ -214,6 +214,7 @@
         }
         button.secondary {
             background-color: #333;
+            color: white;
             padding: 8px 14px;
             font-size: 13px;
         }
@@ -303,6 +304,23 @@
             return input.length > 5 ? input : null;
         }
 
+        // Automatically format pasted URLs onto new lines
+        document.getElementById('playlist-input').addEventListener('paste', function(e) {
+            setTimeout(() => {
+                let val = this.value;
+                // Clean up spacing and ensure each URL or list string gets its own newline
+                let cleaned = val.split(/[\r\n]+/)
+                                 .map(line => line.trim())
+                                 .filter(Boolean)
+                                 .join('\n');
+                if (cleaned && !cleaned.endsWith('\n')) {
+                    cleaned += '\n';
+                }
+                this.value = cleaned;
+                this.scrollTop = this.scrollHeight;
+            }, 10);
+        });
+
         function initJukebox() {
             const rawText = document.getElementById('playlist-input').value;
             const lines = rawText.split(/[\n,]+/);
@@ -349,14 +367,22 @@
             try {
                 const fetchedTracks = player.getPlaylist();
                 const activePlaylistId = playlistPool[currentPlaylistIndex];
-                const activeIndexNum = currentPlaylistIndex + 1;
+                let playlistTitle = `Playlist #${currentPlaylistIndex + 1}`;
+
+                // Attempt to grab the actual YouTube playlist name if exposed by the player API
+                try {
+                    const data = player.getVideoData();
+                    if (data && data.listTitle && data.listTitle !== "") {
+                        playlistTitle = data.listTitle;
+                    }
+                } catch(err) {}
 
                 if (fetchedTracks && Array.isArray(fetchedTracks)) {
                     fetchedTracks.forEach(vId => {
                         masterTrackPool.push({
                             videoId: vId,
-                            playlistId: activePlaylistId,
-                            playlistDisplayNum: activeIndexNum
+                            playlistName: playlistTitle,
+                            playlistId: activePlaylistId
                         });
                     });
                 }
@@ -400,7 +426,7 @@
             const targetTrack = masterTrackPool[randomIndex];
 
             document.getElementById('status-display').innerText = `Active mix (${masterTrackPool.length} tracks)`;
-            document.getElementById('current-playlist-name').innerText = `Playlist #${targetTrack.playlistDisplayNum} (${targetTrack.playlistId})`;
+            document.getElementById('current-playlist-name').innerText = targetTrack.playlistName;
 
             player.loadVideoById(targetTrack.videoId);
             fetchVideoTitle();
@@ -416,6 +442,10 @@
                     const data = player.getVideoData();
                     if (data && data.title && data.title !== "") {
                         document.getElementById('current-song-title').innerText = data.title;
+                        // Grab playlist title here as a secondary fallback if it loaded late
+                        if (data.listTitle && data.listTitle !== "") {
+                            document.getElementById('current-playlist-name').innerText = data.listTitle;
+                        }
                         clearInterval(titleInterval);
                     }
                 } catch (e) {}
