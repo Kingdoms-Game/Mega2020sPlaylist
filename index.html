@@ -129,10 +129,13 @@
         let savedUserInput = "";
         
         const mgPlaylists = [
-            "PLummJXUqplFwnSWc9NmoReXUxzex2nePK", "PLummJXUqplFz6ehgqp3BRasOXui-BOvy2",
-            "PLummJXUqplFz32oq9s-NvLBcGvUJPTKAJ", "PLummJXUqplFx-CgLEqtgnTb0ZwVHaNbLj",
-            "PLummJXUqplFxJS99_arpvNs3iG43tWlQC", "PLummJXUqplFy1OD7kUbix8RGeK-Xg5Rsp",
-            "PLummJXUqplFyItji9z1gz3NyTdp2Iy7ND"
+            "https://www.youtube.com/playlist?list=PLummJXUqplFwnSWc9NmoReXUxzex2nePK",
+            "https://www.youtube.com/playlist?list=PLummJXUqplFz6ehgqp3BRasOXui-BOvy2",
+            "https://www.youtube.com/playlist?list=PLummJXUqplFz32oq9s-NvLBcGvUJPTKAJ",
+            "https://www.youtube.com/playlist?list=PLummJXUqplFx-CgLEqtgnTb0ZwVHaNbLj",
+            "https://www.youtube.com/playlist?list=PLummJXUqplFxJS99_arpvNs3iG43tWlQC",
+            "https://www.youtube.com/playlist?list=PLummJXUqplFy1OD7kUbix8RGeK-Xg5Rsp",
+            "https://www.youtube.com/playlist?list=PLummJXUqplFyItji9z1gz3NyTdp2Iy7ND"
         ];
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -157,17 +160,24 @@
             isMGMode = !isMGMode;
             const btn = document.getElementById('mg-toggle');
             const input = document.getElementById('playlist-input');
+            const panel = document.getElementById('control-panel');
             btn.classList.toggle('active');
 
             if (isMGMode) {
+                // Save user's text, load full MGorille URLs into box, turn on green style, and auto-collapse
                 savedUserInput = input.value;
-                input.value = "Enjoy!";
-                input.disabled = true;
+                input.value = mgPlaylists.join('\n');
                 btn.innerText = "MGorille Radio: ON";
+                if (!panel.classList.contains('collapsed')) {
+                    toggleControlPanel();
+                }
             } else {
-                input.disabled = false;
+                // Restore user's custom input and open the box back up
                 input.value = savedUserInput;
                 btn.innerText = "MGorille Radio";
+                if (panel.classList.contains('collapsed')) {
+                    toggleControlPanel();
+                }
             }
         }
 
@@ -176,25 +186,22 @@
         }
 
         async function initJukebox() {
-            let targetPlaylists = [];
-
-            if (isMGMode) {
-                // Directly use the built-in MGorille playlist array
-                targetPlaylists = mgPlaylists;
-            } else {
-                // Parse user-inputted URLs from the textarea
-                const rawText = document.getElementById('playlist-input').value;
+            const rawText = document.getElementById('playlist-input').value;
+            
+            // Save to localStorage only if we aren't currently running MGorille mode
+            if (!isMGMode) {
                 localStorage.setItem('saved_jukebox_playlists', rawText);
-                targetPlaylists = [...new Set(rawText.split(/[\n,]+/).map(i => {
-                    if (i.includes('list=')) {
-                        try {
-                            const url = new URL(i.startsWith('http') ? i : 'https://www.youtube.com' + i);
-                            return url.searchParams.get('list');
-                        } catch (e) { return null; }
-                    }
-                    return i.trim().length > 5 ? i.trim() : null;
-                }).filter(Boolean))];
             }
+
+            const targetPlaylists = [...new Set(rawText.split(/[\n,]+/).map(i => {
+                if (i.includes('list=')) {
+                    try {
+                        const url = new URL(i.startsWith('http') ? i : 'https://www.youtube.com' + i);
+                        return url.searchParams.get('list');
+                    } catch (e) { return null; }
+                }
+                return i.trim().length > 5 ? i.trim() : null;
+            }).filter(Boolean))];
 
             if (targetPlaylists.length === 0) {
                 alert('Please enter at least one valid playlist URL.');
@@ -214,7 +221,10 @@
             }
             
             masterTrackPool = [...new Set(masterTrackPool)];
-            toggleControlPanel();
+            const panel = document.getElementById('control-panel');
+            if (!panel.classList.contains('collapsed')) {
+                toggleControlPanel();
+            }
             playRandomMasterTrack();
         }
 
