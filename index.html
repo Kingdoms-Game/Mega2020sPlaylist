@@ -303,6 +303,14 @@
         let isJukeboxActive = false;
         let titleInterval = null;
 
+        // Load saved playlists from browser storage automatically on startup
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedPlaylists = localStorage.getItem('saved_jukebox_playlists');
+            if (savedPlaylists) {
+                document.getElementById('playlist-input').value = savedPlaylists;
+            }
+        });
+
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-player', {
                 height: '100%',
@@ -349,17 +357,15 @@
 
         function toggleControlPanel() {
             const panel = document.getElementById('control-panel');
-            const btn = document.getElementById('toggle-collapse-btn');
             panel.classList.toggle('collapsed');
-            if (panel.classList.contains('collapsed')) {
-                btn.innerText = '▼';
-            } else {
-                btn.innerText = '▼';
-            }
         }
 
         function initJukebox() {
             const rawText = document.getElementById('playlist-input').value;
+            
+            // Save to browser memory automatically when launching
+            localStorage.setItem('saved_jukebox_playlists', rawText);
+
             const lines = rawText.split(/[\n,]+/);
             playlistPool = lines.map(item => extractPlaylistId(item)).filter(Boolean);
             playlistPool = [...new Set(playlistPool)];
@@ -440,7 +446,6 @@
             document.getElementById('loading-overlay').classList.add('hidden');
             
             if (masterTrackPool.length > 0) {
-                // Auto-fold the URL input box cleanly upon launch
                 const panel = document.getElementById('control-panel');
                 if (!panel.classList.contains('collapsed')) {
                     toggleControlPanel();
