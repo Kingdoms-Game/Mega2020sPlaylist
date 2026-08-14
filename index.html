@@ -335,6 +335,33 @@
             }
             
             localStorage.removeItem('saved_mg_mode');
+
+            // Intercept paste events to automatically append a newline so the cursor drops down immediately
+            const textarea = document.getElementById('playlist-input');
+            textarea.addEventListener('paste', (e) => {
+                if (isMGMode) return;
+                e.preventDefault();
+                
+                const pastedData = (e.clipboardData || window.clipboardData).getData('text');
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const val = textarea.value;
+
+                // Insert pasted text plus a trailing newline if it doesn't already end with one
+                let addition = pastedData;
+                if (!addition.endsWith('\n') && !addition.endsWith('\r')) {
+                    addition += '\n';
+                }
+
+                textarea.value = val.substring(0, start) + addition + val.substring(end);
+                
+                // Position cursor right at the start of the new fresh line
+                const newCursorPos = start + addition.length;
+                textarea.setSelectionRange(newCursorPos, newCursorPos);
+                
+                // Trigger input save behavior
+                localStorage.setItem('saved_jukebox_playlists', textarea.value);
+            });
         });
 
         function onYouTubeIframeAPIReady() {
