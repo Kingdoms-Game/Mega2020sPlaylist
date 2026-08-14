@@ -105,14 +105,6 @@
             font-weight: bold;
             letter-spacing: 0.5px;
         }
-        .now-playing-banner span.playlist-name {
-            font-size: 13px;
-            font-weight: bold;
-            color: #5b9bd5;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
         .now-playing-banner span.title {
             font-size: 14px;
             font-weight: bold;
@@ -175,7 +167,7 @@
             border-radius: 12px;
             border: 1px solid #333;
             box-sizing: border-box;
-            transition: all 0.3s ease;
+            transition: padding 0.3s ease;
         }
         .control-panel.collapsed {
             padding: 12px 20px;
@@ -183,8 +175,10 @@
         .control-panel.collapsed #input-container {
             display: none;
         }
-        .control-panel.collapsed .helper-text {
-            display: none;
+        .input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
         textarea {
             width: 100%;
@@ -207,6 +201,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+        .left-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         button {
             background-color: #2ecc71;
@@ -231,6 +230,20 @@
         button.secondary:hover {
             background-color: #444;
         }
+        button.toggle-btn {
+            background: none;
+            border: none;
+            color: #bbb;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-family: monospace;
+        }
+        button.toggle-btn:hover {
+            color: #fff;
+            background: #2a2a2a;
+            border-radius: 4px;
+        }
         .helper-text {
             font-size: 13px;
             color: #bbb;
@@ -250,10 +263,9 @@
             <div class="now-playing-banner">
                 <div class="now-playing-info">
                     <span class="label">Now Playing</span>
-                    <span id="current-playlist-name" class="playlist-name">Playlist: --</span>
                     <span id="current-song-title" class="title">Waiting for playback to begin...</span>
                 </div>
-                <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">Next ▶▶</button>
+                <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">▶ Skip</button>
             </div>
 
             <div id="player-container">
@@ -266,10 +278,13 @@
 
             <div id="control-panel" class="control-panel">
                 <div class="button-row">
-                    <span id="status-display" class="helper-text">Ready.</span>
+                    <div class="left-controls">
+                        <button class="toggle-btn" id="toggle-collapse-btn" onclick="toggleControlPanel()" title="Collapse/Expand Playlist Input">▼</button>
+                        <span id="status-display" class="helper-text">Ready.</span>
+                    </div>
                     <button onclick="initJukebox()">Go Go Radio!</button>
                 </div>
-                <div id="input-container">
+                <div id="input-container" class="input-container">
                     <p class="helper-text">Paste your Playlist URLs (one per line):</p>
                     <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
                 </div>
@@ -287,7 +302,6 @@
         let currentPlaylistIndex = 0;
         let isJukeboxActive = false;
         let titleInterval = null;
-        let playlistNamesMap = {};
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-player', {
@@ -333,6 +347,17 @@
             }, 10);
         });
 
+        function toggleControlPanel() {
+            const panel = document.getElementById('control-panel');
+            const btn = document.getElementById('toggle-collapse-btn');
+            panel.classList.toggle('collapsed');
+            if (panel.classList.contains('collapsed')) {
+                btn.innerText = '▶';
+            } else {
+                btn.innerText = '▼';
+            }
+        }
+
         function initJukebox() {
             const rawText = document.getElementById('playlist-input').value;
             const lines = rawText.split(/[\n,]+/);
@@ -347,7 +372,6 @@
             isJukeboxActive = true;
             masterTrackPool = [];
             currentPlaylistIndex = 0;
-            playlistNamesMap = {};
             
             if (player && typeof player.mute === 'function') {
                 player.mute();
@@ -380,16 +404,6 @@
             try {
                 const fetchedTracks = player.getPlaylist();
                 const activePlaylistId = playlistPool[currentPlaylistIndex];
-                let playlistTitle = `Playlist ${currentPlaylistIndex + 1}`;
-
-                try {
-                    const data = player.getVideoData();
-                    if (data && data.listTitle && data.listTitle !== "") {
-                        playlistTitle = data.listTitle;
-                    }
-                } catch(err) {}
-
-                playlistNamesMap[activePlaylistId] = playlistTitle;
 
                 if (fetchedTracks && Array.isArray(fetchedTracks)) {
                     fetchedTracks.forEach(vId => {
@@ -426,8 +440,11 @@
             document.getElementById('loading-overlay').classList.add('hidden');
             
             if (masterTrackPool.length > 0) {
-                // Fold up the URL input box
-                document.getElementById('control-panel').classList.add('collapsed');
+                // Auto-fold the URL input box cleanly upon launch
+                const panel = document.getElementById('control-panel');
+                if (!panel.classList.contains('collapsed')) {
+                    toggleControlPanel();
+                }
                 playRandomMasterTrack();
             } else {
                 alert('Could not index tracks. Make sure the playlist links are public.');
@@ -441,9 +458,6 @@
             const targetTrack = masterTrackPool[randomIndex];
 
             document.getElementById('status-display').innerText = `Tracks: ${masterTrackPool.length}`;
-            
-            let resolvedName = playlistNamesMap[targetTrack.playlistId] || 'Unknown Playlist';
-            document.getElementById('current-playlist-name').innerText = resolvedName;
 
             player.loadVideoById(targetTrack.videoId);
             fetchVideoTitle();
@@ -459,10 +473,6 @@
                     const data = player.getVideoData();
                     if (data && data.title && data.title !== "") {
                         document.getElementById('current-song-title').innerText = data.title;
-                        if (data.listTitle && data.listTitle !== "") {
-                            playlistNamesMap[playlistPool[currentPlaylistIndex - 1] || playlistPool[0]] = data.listTitle;
-                            document.getElementById('current-playlist-name').innerText = data.listTitle;
-                        }
                         clearInterval(titleInterval);
                     }
                 } catch (e) {}
