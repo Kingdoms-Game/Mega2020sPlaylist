@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Go Go Radio! Multi-Playlist Multi-Plex!</title>
+    <title>Autonomous Cross-Playlist Jukebox</title>
     <style>
         body {
             font-family: sans-serif;
@@ -21,7 +21,7 @@
             overflow-x: hidden;
         }
 
-        /* Legit 8-Bit Hanging Curtains */
+        /* 8-Bit Curtains */
         .curtain {
             position: fixed;
             top: 0;
@@ -29,7 +29,7 @@
             width: 16vw;
             min-width: 120px;
             max-width: 260px;
-            background-color: #5c1d24; /* Deep Arcade Red */
+            background-color: #5c1d24;
             background-image: 
                 linear-gradient(90deg, #2b0b0e 15%, transparent 15%, transparent 30%, #8c2e38 30%, #8c2e38 45%, #2b0b0e 45%, #2b0b0e 60%, transparent 60%, transparent 75%, #421217 75%);
             background-size: 40px 100%;
@@ -38,17 +38,8 @@
             pointer-events: none;
             box-shadow: inset -10px 0 20px rgba(0,0,0,0.6);
         }
-        .curtain.left { 
-            left: 0; 
-            border-right: 8px solid #1a0507;
-        }
-        .curtain.right { 
-            right: 0; 
-            border-left: 8px solid #1a0507;
-            transform: scaleX(-1);
-        }
-
-        /* Top 8-bit Valance Fringe */
+        .curtain.left { left: 0; border-right: 8px solid #1a0507; }
+        .curtain.right { right: 0; border-left: 8px solid #1a0507; transform: scaleX(-1); }
         .curtain::before {
             content: "";
             position: absolute;
@@ -62,445 +53,180 @@
             border-bottom: 4px solid #1a0507;
         }
 
-        .main-layout {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 760px;
-            max-width: 100%;
-            gap: 16px;
-            z-index: 1;
-        }
-        .player-section {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .now-playing-banner {
-            background: #1e1e1e;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 12px 15px;
-            font-size: 14px;
-            color: #ddd;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-sizing: border-box;
-        }
-        .now-playing-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            overflow: hidden;
-            flex: 1;
-            margin-right: 15px;
-        }
-        .now-playing-banner span.label {
-            font-size: 11px;
-            text-transform: uppercase;
-            color: #888;
+        .main-layout { width: 760px; max-width: 100%; gap: 16px; display: flex; flex-direction: column; z-index: 1; }
+        .now-playing-banner { background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .title { font-size: 14px; font-weight: bold; color: #ff7777; }
+        #player-container { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; position: relative; }
+        
+        .control-panel { background: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333; transition: all 0.3s ease; }
+        .control-panel.collapsed { padding: 12px 20px; }
+        .control-panel.collapsed #input-container { display: none; }
+        
+        textarea { width: 100%; height: 90px; background: #121212; color: #fff; border: 1px solid #444; border-radius: 6px; padding: 10px; font-family: monospace; resize: vertical; box-sizing: border-box; }
+        textarea:focus { outline: none; border-color: #2ecc71; }
+        
+        .button-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        
+        button { background-color: #2ecc71; color: black; border: none; padding: 10px 18px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+        button:hover { background-color: #27ae60; }
+        button.secondary { background-color: #333; color: #aaa; padding: 8px 14px; font-size: 13px; }
+        button.secondary:hover { background-color: #444; color: #fff; }
+        button.toggle-btn { background: none; color: #bbb; font-size: 16px; border: none; cursor: pointer; padding: 4px 8px; }
+        button.toggle-btn:hover { color: #fff; background: #2a2a2a; border-radius: 4px; }
+        
+        #mg-toggle { 
+            width: 100%; 
+            margin-top: 10px; 
+            background: #2c3e50; 
+            color: #95a5a6; 
+            font-size: 12px; 
+            padding: 8px; 
             font-weight: bold;
-            letter-spacing: 0.5px;
         }
-        .now-playing-banner span.title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #ff7777;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        #player-container {
-            width: 100%;
-            aspect-ratio: 16/9;
-            background: #000;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-            border-radius: 12px;
-            overflow: hidden;
-            position: relative;
-        }
-        #loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #161616;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            z-index: 10;
-            transition: opacity 0.4s ease;
-        }
-        #loading-overlay.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-        .spinner {
-            width: 36px;
-            height: 36px;
-            border: 3px solid #333;
-            border-top: 3px solid #ff0000;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .loading-text {
-            font-size: 14px;
-            color: #aaa;
-            font-family: monospace;
-        }
-        .control-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            background: #1e1e1e;
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #333;
-            box-sizing: border-box;
-            transition: padding 0.3s ease;
-        }
-        .control-panel.collapsed {
-            padding: 12px 20px;
-        }
-        .control-panel.collapsed #input-container {
-            display: none;
-        }
-        .input-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        textarea {
-            width: 100%;
-            height: 90px;
-            background: #121212;
-            color: #fff;
-            border: 1px solid #444;
-            border-radius: 6px;
-            padding: 10px;
-            font-family: monospace;
-            font-size: 13px;
-            resize: vertical;
-            box-sizing: border-box;
-        }
-        textarea:focus {
-            outline: none;
-            border-color: #2ecc71;
-        }
-        .button-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .left-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        button {
-            background-color: #2ecc71;
-            color: black;
-            border: none;
-            padding: 10px 18px;
-            font-size: 14px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:hover {
-            background-color: #27ae60;
-        }
-        button.secondary {
-            background-color: #333;
-            color: #aaa;
-            padding: 8px 14px;
-            font-size: 13px;
-        }
-        button.secondary:hover {
-            background-color: #444;
-            color: #fff;
-        }
-        button.toggle-btn {
-            background: none;
-            border: none;
-            color: #bbb;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 4px 8px;
-            font-family: monospace;
-        }
-        button.toggle-btn:hover {
-            color: #fff;
-            background: #2a2a2a;
-            border-radius: 4px;
-        }
-        .helper-text {
-            font-size: 13px;
-            color: #bbb;
-            margin: 0;
-        }
+        #mg-toggle:hover { background: #34495e; }
+        #mg-toggle.active { background: #2ecc71; color: black; }
+        #mg-toggle.active:hover { background: #27ae60; }
     </style>
 </head>
 <body>
 
-    <!-- 8-Bit Arcade Curtains -->
     <div class="curtain left"></div>
     <div class="curtain right"></div>
 
     <div class="main-layout">
-        <!-- Player & Controls Section -->
-        <div class="player-section">
-            <div class="now-playing-banner">
-                <div class="now-playing-info">
-                    <span class="label">Now Playing</span>
-                    <span id="current-song-title" class="title">Waiting for playback to begin...</span>
-                </div>
-                <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">Next ▶▶</button>
+        <div class="now-playing-banner">
+            <div class="now-playing-info">
+                <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Now Playing</span><br>
+                <span id="current-song-title" class="title">Waiting for playback to begin...</span>
             </div>
+            <button class="secondary" onclick="playRandomMasterTrack()">▶ Skip</button>
+        </div>
 
-            <div id="player-container">
-                <div id="loading-overlay" class="hidden">
-                    <div class="spinner"></div>
-                    <span id="overlay-status" class="loading-text">Indexing playlists...</span>
+        <div id="player-container">
+            <div id="youtube-player"></div>
+        </div>
+
+        <div id="control-panel" class="control-panel">
+            <div class="button-row">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <button class="toggle-btn" onclick="toggleControlPanel()">▼</button>
+                    <span id="status-display" style="font-size: 13px; color: #bbb;">Ready.</span>
                 </div>
-                <div id="youtube-player"></div>
+                <button onclick="initJukebox()">Go Go Radio!</button>
             </div>
-
-            <div id="control-panel" class="control-panel">
-                <div class="button-row">
-                    <div class="left-controls">
-                        <button class="toggle-btn" id="toggle-collapse-btn" onclick="toggleControlPanel()" title="Collapse/Expand Playlist Input">▼</button>
-                        <span id="status-display" class="helper-text">Ready.</span>
-                    </div>
-                    <button onclick="initJukebox()">Go Go Radio!</button>
-                </div>
-                <div id="input-container" class="input-container">
-                    <p class="helper-text">Paste your Playlist URLs (one per line):</p>
-                    <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
-                </div>
+            <div id="input-container">
+                <p style="font-size: 13px; color: #bbb; margin: 0 0 8px 0;">Paste your Playlist URLs (one per line):</p>
+                <textarea id="playlist-input"></textarea>
+                <button id="mg-toggle" onclick="toggleMGorilleMode()">MGorille Radio</button>
             </div>
         </div>
     </div>
 
-    <!-- YouTube IFrame API Script Loader -->
     <script src="https://www.youtube.com/iframe_api"></script>
-
     <script>
-        let player;
-        let playlistPool = [];
-        let masterTrackPool = [];
-        let currentPlaylistIndex = 0;
-        let isJukeboxActive = false;
-        let titleInterval = null;
+        let player, masterTrackPool = [], isJukeboxActive = false;
+        let isMGMode = false;
+        let savedUserInput = ""; // Remembers what the user typed before switching to MG mode
+        
+        const mgPlaylists = [
+            "PLummJXUqplFwnSWc9NmoReXUxzex2nePK", "PLummJXUqplFz6ehgqp3BRasOXui-BOvy2",
+            "PLummJXUqplFz32oq9s-NvLBcGvUJPTKAJ", "PLummJXUqplFx-CgLEqtgnTb0ZwVHaNbLj",
+            "PLummJXUqplFxJS99_arpvNs3iG43tWlQC", "PLummJXUqplFy1OD7kUbix8RGeK-Xg5Rsp",
+            "PLummJXUqplFyItji9z1gz3NyTdp2Iy7ND"
+        ];
 
-        // Automatically load saved playlists from browser storage on startup
         window.addEventListener('DOMContentLoaded', () => {
-            const savedPlaylists = localStorage.getItem('saved_jukebox_playlists');
-            if (savedPlaylists) {
-                document.getElementById('playlist-input').value = savedPlaylists;
+            const saved = localStorage.getItem('saved_jukebox_playlists');
+            if (saved) {
+                document.getElementById('playlist-input').value = saved;
             }
         });
 
         function onYouTubeIframeAPIReady() {
-            player = new YT.Player('youtube-player', {
-                height: '100%',
-                width: '100%',
-                playerVars: {
-                    'autoplay': 1,
-                    'enablejsapi': 1,
-                    'origin': window.location.origin
-                },
-                events: {
-                    'onStateChange': onPlayerStateChange,
-                    'onError': onPlayerError
-                }
+            player = new YT.Player('youtube-player', { 
+                height: '100%', 
+                width: '100%', 
+                events: { 
+                    'onStateChange': e => { if(e.data === 0) playRandomMasterTrack() }, 
+                    'onError': playRandomMasterTrack 
+                } 
             });
         }
 
-        function extractPlaylistId(input) {
-            input = input.trim();
-            if (input.includes('list=')) {
-                try {
-                    const url = new URL(input.startsWith('http') ? input : 'https://www.youtube.com' + input);
-                    return url.searchParams.get('list');
-                } catch (e) {
-                    return null;
-                }
+        function toggleMGorilleMode() {
+            isMGMode = !isMGMode;
+            const btn = document.getElementById('mg-toggle');
+            const input = document.getElementById('playlist-input');
+            btn.classList.toggle('active');
+
+            if (isMGMode) {
+                // Save whatever the user currently has typed, then show a clean message
+                savedUserInput = input.value;
+                input.value = "Enjoy!";
+                input.disabled = true; // Locks the box so it feels like a preset mode
+                btn.innerText = "MGorille Radio: ON";
+            } else {
+                // Restore user's custom input and re-enable the box
+                input.disabled = false;
+                input.value = savedUserInput;
+                btn.innerText = "MGorille Radio";
             }
-            return input.length > 5 ? input : null;
         }
 
-        // Automatically format pasted URLs onto new lines
-        document.getElementById('playlist-input').addEventListener('paste', function(e) {
-            setTimeout(() => {
-                let val = this.value;
-                let cleaned = val.split(/[\r\n]+/)
-                                 .map(line => line.trim())
-                                 .filter(Boolean)
-                                 .join('\n');
-                if (cleaned && !cleaned.endsWith('\n')) {
-                    cleaned += '\n';
-                }
-                this.value = cleaned;
-                this.scrollTop = this.scrollHeight;
-            }, 10);
-        });
-
-        function toggleControlPanel() {
-            const panel = document.getElementById('control-panel');
-            panel.classList.toggle('collapsed');
+        function toggleControlPanel() { 
+            document.getElementById('control-panel').classList.toggle('collapsed'); 
         }
 
-        function initJukebox() {
-            const rawText = document.getElementById('playlist-input').value;
-            
-            // Save to browser memory automatically when launching
-            localStorage.setItem('saved_jukebox_playlists', rawText);
+        async function initJukebox() {
+            let targetPlaylists = [];
 
-            const lines = rawText.split(/[\n,]+/);
-            playlistPool = lines.map(item => extractPlaylistId(item)).filter(Boolean);
-            playlistPool = [...new Set(playlistPool)];
+            if (isMGMode) {
+                targetPlaylists = mgPlaylists;
+            } else {
+                const rawText = document.getElementById('playlist-input').value;
+                localStorage.setItem('saved_jukebox_playlists', rawText);
+                targetPlaylists = [...new Set(rawText.split(/[\n,]+/).map(i => {
+                    if (i.includes('list=')) {
+                        try {
+                            const url = new URL(i.startsWith('http') ? i : 'https://www.youtube.com' + i);
+                            return url.searchParams.get('list');
+                        } catch (e) { return null; }
+                    }
+                    return i.trim().length > 5 ? i.trim() : null;
+                }).filter(Boolean))];
+            }
 
-            if (playlistPool.length === 0) {
+            if (targetPlaylists.length === 0) {
                 alert('Please enter at least one valid playlist URL.');
                 return;
             }
 
-            isJukeboxActive = true;
             masterTrackPool = [];
-            currentPlaylistIndex = 0;
+            isJukeboxActive = true;
+            document.getElementById('status-display').innerText = "Indexing playlists...";
+
+            for (let i = 0; i < targetPlaylists.length; i++) {
+                document.getElementById('status-display').innerText = `Indexing ${i + 1} of ${targetPlaylists.length}...`;
+                player.loadPlaylist({list: targetPlaylists[i], listType: 'playlist'});
+                await new Promise(r => setTimeout(r, 2000));
+                const tracks = player.getPlaylist();
+                if(tracks) tracks.forEach(vId => masterTrackPool.push(vId));
+            }
             
-            if (player && typeof player.mute === 'function') {
-                player.mute();
-            }
-
-            const overlay = document.getElementById('loading-overlay');
-            overlay.classList.remove('hidden');
-            document.getElementById('overlay-status').innerText = `Indexing playlist 1 of ${playlistPool.length}...`;
-            document.getElementById('status-display').innerText = `Indexing playlists...`;
-
-            loadNextPlaylistForIndexing();
-        }
-
-        function loadNextPlaylistForIndexing() {
-            if (currentPlaylistIndex < playlistPool.length) {
-                document.getElementById('overlay-status').innerText = `Indexing playlist ${currentPlaylistIndex + 1} of ${playlistPool.length}...`;
-                const targetId = playlistPool[currentPlaylistIndex];
-                player.loadPlaylist({
-                    list: targetId,
-                    listType: 'playlist',
-                    index: 0
-                });
-                setTimeout(harvestTracksFromCurrentPlayer, 1500);
-            } else {
-                FINALIZE_INDEXING();
-            }
-        }
-
-        function harvestTracksFromCurrentPlayer() {
-            try {
-                const fetchedTracks = player.getPlaylist();
-                const activePlaylistId = playlistPool[currentPlaylistIndex];
-
-                if (fetchedTracks && Array.isArray(fetchedTracks)) {
-                    fetchedTracks.forEach(vId => {
-                        masterTrackPool.push({
-                            videoId: vId,
-                            playlistId: activePlaylistId
-                        });
-                    });
-                }
-            } catch (e) {
-                console.log('Error harvesting playlist:', e);
-            }
-
-            currentPlaylistIndex++;
-            if (currentPlaylistIndex < playlistPool.length) {
-                loadNextPlaylistForIndexing();
-            } else {
-                FINALIZE_INDEXING();
-            }
-        }
-
-        function FINALIZE_INDEXING() {
-            const seen = new Set();
-            masterTrackPool = masterTrackPool.filter(item => {
-                if (seen.has(item.videoId)) return false;
-                seen.add(item.videoId);
-                return true;
-            });
-            
-            if (player && typeof player.unMute === 'function') {
-                player.unMute();
-            }
-
-            document.getElementById('loading-overlay').classList.add('hidden');
-            
-            if (masterTrackPool.length > 0) {
-                const panel = document.getElementById('control-panel');
-                if (!panel.classList.contains('collapsed')) {
-                    toggleControlPanel();
-                }
-                playRandomMasterTrack();
-            } else {
-                alert('Could not index tracks. Make sure the playlist links are public.');
-            }
+            masterTrackPool = [...new Set(masterTrackPool)];
+            toggleControlPanel();
+            playRandomMasterTrack();
         }
 
         function playRandomMasterTrack() {
-            if (!isJukeboxActive || masterTrackPool.length === 0) return;
-
-            const randomIndex = Math.floor(Math.random() * masterTrackPool.length);
-            const targetTrack = masterTrackPool[randomIndex];
-
+            if(!isJukeboxActive || masterTrackPool.length === 0) return;
+            player.loadVideoById(masterTrackPool[Math.floor(Math.random() * masterTrackPool.length)]);
+            setTimeout(() => {
+                const data = player.getVideoData();
+                if(data && data.title) document.getElementById('current-song-title').innerText = data.title;
+            }, 1000);
             document.getElementById('status-display').innerText = `Tracks: ${masterTrackPool.length}`;
-
-            player.loadVideoById(targetTrack.videoId);
-            fetchVideoTitle();
-        }
-
-        function fetchVideoTitle() {
-            if (titleInterval) clearInterval(titleInterval);
-            
-            let attempts = 0;
-            titleInterval = setInterval(() => {
-                attempts++;
-                try {
-                    const data = player.getVideoData();
-                    if (data && data.title && data.title !== "") {
-                        document.getElementById('current-song-title').innerText = data.title;
-                        clearInterval(titleInterval);
-                    }
-                } catch (e) {}
-                if (attempts > 20) {
-                    clearInterval(titleInterval);
-                }
-            }, 300);
-        }
-
-        function onPlayerStateChange(event) {
-            if (event.data === YT.PlayerState.ENDED && isJukeboxActive) {
-                playRandomMasterTrack();
-            }
-        }
-
-        function onPlayerError(event) {
-            // Automatically skip deleted, private, or embed-blocked videos instantly
-            if (isJukeboxActive) {
-                playRandomMasterTrack();
-            }
         }
     </script>
-
 </body>
 </html>
