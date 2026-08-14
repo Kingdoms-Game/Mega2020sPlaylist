@@ -30,7 +30,6 @@
             min-width: 120px;
             max-width: 260px;
             background-color: #5c1d24; /* Deep Arcade Red */
-            /* 8-bit vertical drape pleats using sharp pixel gradients */
             background-image: 
                 linear-gradient(90deg, #2b0b0e 15%, transparent 15%, transparent 30%, #8c2e38 30%, #8c2e38 45%, #2b0b0e 45%, #2b0b0e 60%, transparent 60%, transparent 75%, #421217 75%);
             background-size: 40px 100%;
@@ -46,7 +45,7 @@
         .curtain.right { 
             right: 0; 
             border-left: 8px solid #1a0507;
-            transform: scaleX(-1); /* Flips pleats symmetrically */
+            transform: scaleX(-1);
         }
 
         /* Top 8-bit Valance Fringe */
@@ -223,12 +222,13 @@
         }
         button.secondary {
             background-color: #333;
-            color: white;
+            color: #aaa;
             padding: 8px 14px;
             font-size: 13px;
         }
         button.secondary:hover {
             background-color: #444;
+            color: #fff;
         }
         button.toggle-btn {
             background: none;
@@ -265,7 +265,7 @@
                     <span class="label">Now Playing</span>
                     <span id="current-song-title" class="title">Waiting for playback to begin...</span>
                 </div>
-                <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">▶ Skip</button>
+                <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">Next ▶▶</button>
             </div>
 
             <div id="player-container">
@@ -303,7 +303,7 @@
         let isJukeboxActive = false;
         let titleInterval = null;
 
-        // Load saved playlists from browser storage automatically on startup
+        // Automatically load saved playlists from browser storage on startup
         window.addEventListener('DOMContentLoaded', () => {
             const savedPlaylists = localStorage.getItem('saved_jukebox_playlists');
             if (savedPlaylists) {
@@ -321,7 +321,8 @@
                     'origin': window.location.origin
                 },
                 events: {
-                    'onStateChange': onPlayerStateChange
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
                 }
             });
         }
@@ -489,6 +490,13 @@
 
         function onPlayerStateChange(event) {
             if (event.data === YT.PlayerState.ENDED && isJukeboxActive) {
+                playRandomMasterTrack();
+            }
+        }
+
+        function onPlayerError(event) {
+            // Automatically skip deleted, private, or embed-blocked videos instantly
+            if (isJukeboxActive) {
                 playRandomMasterTrack();
             }
         }
