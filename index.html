@@ -109,7 +109,7 @@
         <div id="control-panel" class="control-panel">
             <div class="button-row">
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <button class="toggle-btn" onclick="toggleControlPanel()">▼</button>
+                    <button class="toggle-btn" id="toggle-collapse-btn" onclick="toggleControlPanel()">▼</button>
                     <span id="status-display" style="font-size: 13px; color: #bbb;">Ready.</span>
                 </div>
                 <button onclick="initJukebox()">Go Go Radio!</button>
@@ -126,7 +126,7 @@
     <script>
         let player, masterTrackPool = [], isJukeboxActive = false;
         let isMGMode = false;
-        let savedUserInput = ""; // Remembers what the user typed before switching to MG mode
+        let savedUserInput = "";
         
         const mgPlaylists = [
             "PLummJXUqplFwnSWc9NmoReXUxzex2nePK", "PLummJXUqplFz6ehgqp3BRasOXui-BOvy2",
@@ -160,13 +160,11 @@
             btn.classList.toggle('active');
 
             if (isMGMode) {
-                // Save whatever the user currently has typed, then show a clean message
                 savedUserInput = input.value;
                 input.value = "Enjoy!";
-                input.disabled = true; // Locks the box so it feels like a preset mode
+                input.disabled = true;
                 btn.innerText = "MGorille Radio: ON";
             } else {
-                // Restore user's custom input and re-enable the box
                 input.disabled = false;
                 input.value = savedUserInput;
                 btn.innerText = "MGorille Radio";
@@ -181,8 +179,10 @@
             let targetPlaylists = [];
 
             if (isMGMode) {
+                // Directly use the built-in MGorille playlist array
                 targetPlaylists = mgPlaylists;
             } else {
+                // Parse user-inputted URLs from the textarea
                 const rawText = document.getElementById('playlist-input').value;
                 localStorage.setItem('saved_jukebox_playlists', rawText);
                 targetPlaylists = [...new Set(rawText.split(/[\n,]+/).map(i => {
