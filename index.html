@@ -147,7 +147,7 @@
     <div class="main-layout">
         <div class="now-playing-banner">
             <div class="now-playing-info">
-                <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Now Playing</span><br>
+                <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Now Playing<span id="now-playing-mode"></span></span><br>
                 <span id="current-song-title" class="title">Waiting for playback to begin...</span>
             </div>
             <button class="secondary" onclick="playRandomMasterTrack()">▶ Skip</button>
@@ -222,6 +222,7 @@
             isMGMode = !isMGMode;
             const btn = document.getElementById('mg-toggle');
             const input = document.getElementById('playlist-input');
+            const modeIndicator = document.getElementById('now-playing-mode');
             btn.classList.toggle('active');
 
             if (isMGMode) {
@@ -229,10 +230,12 @@
                 input.value = "Enjoy!";
                 input.disabled = true;
                 btn.innerText = "Radio M.Gorille: ON";
+                modeIndicator.innerText = ": Radio M.Gorille";
             } else {
                 input.disabled = false;
                 input.value = savedUserInput;
                 btn.innerText = "Radio M.Gorille";
+                modeIndicator.innerText = "";
             }
 
             initJukebox();
@@ -281,7 +284,6 @@
             overlay.classList.remove('hidden');
             fillBar.style.width = '0%';
 
-            // Set initial label based on mode (numbers for user playlists, clean text for Radio M.Gorille)
             if (isMGMode) {
                 statusLabel.innerText = `${modeTitle}...`;
             } else {
@@ -295,7 +297,6 @@
                 
                 fillBar.style.width = percent + '%';
                 
-                // Update text dynamically per mode
                 if (isMGMode) {
                     statusLabel.innerText = `${modeTitle}...`;
                 } else {
