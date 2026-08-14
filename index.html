@@ -315,6 +315,7 @@
         ];
 
         window.addEventListener('DOMContentLoaded', () => {
+            // Restore saved user playlists or M.Gorille state into the input UI
             const saved = localStorage.getItem('saved_jukebox_playlists');
             if (saved) {
                 document.getElementById('playlist-input').value = saved;
@@ -333,6 +334,10 @@
                 btn.innerText = "Radio M.Gorille: ON";
                 modeIndicator.innerText = ": Radio M.Gorille";
             }
+            
+            // Explicitly clear any auto-init persistence flags so every refresh 
+            // always boots up fresh on the default tutorial screen.
+            localStorage.removeItem('saved_mg_mode');
         });
 
         function onYouTubeIframeAPIReady() {
@@ -347,10 +352,7 @@
                 },
                 events: { 
                     'onReady': () => {
-                        const wasMG = localStorage.getItem('saved_mg_mode') === 'true';
-                        if (wasMG) {
-                            initJukebox();
-                        }
+                        // intentionally left un-triggered on load to ensure we stay on the tutorial overlay
                     },
                     'onStateChange': e => { 
                         if(e.data === 0) {
