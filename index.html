@@ -78,7 +78,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 12px;
+            gap: 14px;
             z-index: 10;
             transition: opacity 0.4s ease;
         }
@@ -86,22 +86,27 @@
             opacity: 0;
             pointer-events: none;
         }
-        .spinner {
-            width: 36px;
-            height: 36px;
-            border: 3px solid #333;
-            border-top: 3px solid #ff0000;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
         .loading-text {
             font-size: 14px;
             color: #aaa;
             font-family: monospace;
+        }
+
+        /* Subtle Maroon Progress Bar Container with Green Fill */
+        .progress-track {
+            width: 220px;
+            height: 12px;
+            background: #2b0b0e; /* Deep arcade maroon/red-ish box */
+            border: 2px solid #5c1d24;
+            border-radius: 4px;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background-color: #2ecc71; /* Button-matching green */
+            transition: width 0.3s ease;
         }
         
         .control-panel { background: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333; transition: all 0.3s ease; }
@@ -145,13 +150,15 @@
                 <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Now Playing</span><br>
                 <span id="current-song-title" class="title">Waiting for playback to begin...</span>
             </div>
-            <button class="secondary" onclick="playRandomMasterTrack()">Next ▶▶</button>
+            <button class="secondary" onclick="playRandomMasterTrack()">▶ Skip</button>
         </div>
 
         <div id="player-container">
             <div id="loading-overlay" class="hidden">
-                <div class="spinner"></div>
                 <span id="overlay-status" class="loading-text">Indexing playlists...</span>
+                <div class="progress-track">
+                    <div id="progress-bar-fill" class="progress-fill"></div>
+                </div>
             </div>
             <div id="youtube-player"></div>
         </div>
@@ -228,7 +235,6 @@
                 btn.innerText = "Radio M.Gorille";
             }
 
-            // Instantly launch loading & indexing for the selected mode
             initJukebox();
         }
 
@@ -269,12 +275,18 @@
             }
 
             const overlay = document.getElementById('loading-overlay');
+            const fillBar = document.getElementById('progress-bar-fill');
+            
             overlay.classList.remove('hidden');
+            fillBar.style.width = '0%';
             document.getElementById('overlay-status').innerText = loadingMessage;
             document.getElementById('status-display').innerText = loadingMessage;
 
             for (let i = 0; i < targetPlaylists.length; i++) {
+                let percent = Math.round(((i + 1) / targetPlaylists.length) * 100);
+                fillBar.style.width = percent + '%';
                 document.getElementById('overlay-status').innerText = `${loadingMessage} (${i + 1}/${targetPlaylists.length})`;
+                
                 player.loadPlaylist({list: targetPlaylists[i], listType: 'playlist', index: 0});
                 await new Promise(r => setTimeout(r, 1500));
                 try {
