@@ -129,13 +129,13 @@
         let savedUserInput = "";
         
         const mgPlaylists = [
-            "https://www.youtube.com/playlist?list=PLummJXUqplFwnSWc9NmoReXUxzex2nePK",
-            "https://www.youtube.com/playlist?list=PLummJXUqplFz6ehgqp3BRasOXui-BOvy2",
-            "https://www.youtube.com/playlist?list=PLummJXUqplFz32oq9s-NvLBcGvUJPTKAJ",
-            "https://www.youtube.com/playlist?list=PLummJXUqplFx-CgLEqtgnTb0ZwVHaNbLj",
-            "https://www.youtube.com/playlist?list=PLummJXUqplFxJS99_arpvNs3iG43tWlQC",
-            "https://www.youtube.com/playlist?list=PLummJXUqplFy1OD7kUbix8RGeK-Xg5Rsp",
-            "https://www.youtube.com/playlist?list=PLummJXUqplFyItji9z1gz3NyTdp2Iy7ND"
+            "PLummJXUqplFwnSWc9NmoReXUxzex2nePK",
+            "PLummJXUqplFz6ehgqp3BRasOXui-BOvy2",
+            "PLummJXUqplFz32oq9s-NvLBcGvUJPTKAJ",
+            "PLummJXUqplFx-CgLEqtgnTb0ZwVHaNbLj",
+            "PLummJXUqplFxJS99_arpvNs3iG43tWlQC",
+            "PLummJXUqplFy1OD7kUbix8RGeK-Xg5Rsp",
+            "PLummJXUqplFyItji9z1gz3NyTdp2Iy7ND"
         ];
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -160,24 +160,19 @@
             isMGMode = !isMGMode;
             const btn = document.getElementById('mg-toggle');
             const input = document.getElementById('playlist-input');
-            const panel = document.getElementById('control-panel');
             btn.classList.toggle('active');
 
             if (isMGMode) {
-                // Save user's text, load full MGorille URLs into box, turn on green style, and auto-collapse
+                // Save user's text, show "Enjoy!", and lock the box
                 savedUserInput = input.value;
-                input.value = mgPlaylists.join('\n');
+                input.value = "Enjoy!";
+                input.disabled = true;
                 btn.innerText = "MGorille Radio: ON";
-                if (!panel.classList.contains('collapsed')) {
-                    toggleControlPanel();
-                }
             } else {
-                // Restore user's custom input and open the box back up
+                // Restore user's custom text and unlock the box
+                input.disabled = false;
                 input.value = savedUserInput;
                 btn.innerText = "MGorille Radio";
-                if (panel.classList.contains('collapsed')) {
-                    toggleControlPanel();
-                }
             }
         }
 
@@ -186,22 +181,24 @@
         }
 
         async function initJukebox() {
-            const rawText = document.getElementById('playlist-input').value;
-            
-            // Save to localStorage only if we aren't currently running MGorille mode
-            if (!isMGMode) {
-                localStorage.setItem('saved_jukebox_playlists', rawText);
-            }
+            let targetPlaylists = [];
 
-            const targetPlaylists = [...new Set(rawText.split(/[\n,]+/).map(i => {
-                if (i.includes('list=')) {
-                    try {
-                        const url = new URL(i.startsWith('http') ? i : 'https://www.youtube.com' + i);
-                        return url.searchParams.get('list');
-                    } catch (e) { return null; }
-                }
-                return i.trim().length > 5 ? i.trim() : null;
-            }).filter(Boolean))];
+            if (isMGMode) {
+                // Use the hidden built-in IDs directly
+                targetPlaylists = mgPlaylists;
+            } else {
+                const rawText = document.getElementById('playlist-input').value;
+                localStorage.setItem('saved_jukebox_playlists', rawText);
+                targetPlaylists = [...new Set(rawText.split(/[\n,]+/).map(i => {
+                    if (i.includes('list=')) {
+                        try {
+                            const url = new URL(i.startsWith('http') ? i : 'https://www.youtube.com' + i);
+                            return url.searchParams.get('list');
+                        } catch (e) { return null; }
+                    }
+                    return i.trim().length > 5 ? i.trim() : null;
+                }).filter(Boolean))];
+            }
 
             if (targetPlaylists.length === 0) {
                 alert('Please enter at least one valid playlist URL.');
