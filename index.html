@@ -17,18 +17,63 @@
             margin: 0;
             padding: 20px;
             box-sizing: border-box;
+            position: relative;
+            overflow-x: hidden;
         }
+
+        /* Legit 8-Bit Hanging Curtains */
+        .curtain {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            width: 16vw;
+            min-width: 120px;
+            max-width: 260px;
+            background-color: #5c1d24; /* Deep Arcade Red */
+            /* 8-bit vertical drape pleats using sharp pixel gradients */
+            background-image: 
+                linear-gradient(90deg, #2b0b0e 15%, transparent 15%, transparent 30%, #8c2e38 30%, #8c2e38 45%, #2b0b0e 45%, #2b0b0e 60%, transparent 60%, transparent 75%, #421217 75%);
+            background-size: 40px 100%;
+            border-bottom: 8px solid #1a0507;
+            z-index: 100;
+            pointer-events: none;
+            box-shadow: inset -10px 0 20px rgba(0,0,0,0.6);
+        }
+        .curtain.left { 
+            left: 0; 
+            border-right: 8px solid #1a0507;
+        }
+        .curtain.right { 
+            right: 0; 
+            border-left: 8px solid #1a0507;
+            transform: scaleX(-1); /* Flips pleats symmetrically */
+        }
+
+        /* Top 8-bit Valance Fringe */
+        .curtain::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 24px;
+            background-color: #8c2e38;
+            background-image: linear-gradient(90deg, #1a0507 50%, #5c1d24 50%);
+            background-size: 16px 16px;
+            border-bottom: 4px solid #1a0507;
+        }
+
         .main-layout {
             display: flex;
-            gap: 20px;
-            width: 1200px;
+            flex-direction: column;
+            align-items: center;
+            width: 760px;
             max-width: 100%;
-            flex-wrap: wrap;
-            justify-content: center;
+            gap: 16px;
+            z-index: 1;
         }
         .player-section {
-            flex: 1;
-            min-width: 700px;
+            width: 100%;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -60,7 +105,16 @@
             font-weight: bold;
             letter-spacing: 0.5px;
         }
+        .now-playing-banner span.playlist-name {
+            font-size: 13px;
+            font-weight: bold;
+            color: #5b9bd5;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .now-playing-banner span.title {
+            font-size: 14px;
             font-weight: bold;
             color: #ff7777;
             overflow: hidden;
@@ -137,7 +191,7 @@
         }
         textarea:focus {
             outline: none;
-            border-color: #ff0000;
+            border-color: #2ecc71;
         }
         .button-row {
             display: flex;
@@ -145,7 +199,7 @@
             align-items: center;
         }
         button {
-            background-color: #ff0000;
+            background-color: #2ecc71;
             color: white;
             border: none;
             padding: 10px 18px;
@@ -156,7 +210,7 @@
             transition: background 0.2s;
         }
         button:hover {
-            background-color: #cc0000;
+            background-color: #27ae60;
         }
         button.secondary {
             background-color: #333;
@@ -165,53 +219,6 @@
         }
         button.secondary:hover {
             background-color: #444;
-        }
-        .text-log-section {
-            width: 320px;
-            background: #1e1e1e;
-            border: 1px solid #333;
-            border-radius: 12px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            box-sizing: border-box;
-            max-height: 580px;
-        }
-        .text-log-section h3 {
-            margin-top: 0;
-            font-size: 15px;
-            color: #aaa;
-            border-bottom: 1px solid #333;
-            padding-bottom: 8px;
-        }
-        #playlist-queue-list {
-            flex: 1;
-            background: #121212;
-            border: 1px solid #333;
-            border-radius: 6px;
-            padding: 10px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 12px;
-            color: #ccc;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .queue-item {
-            background: #1a1a1a;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #333;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .queue-item span {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: 180px;
         }
         .helper-text {
             font-size: 13px;
@@ -222,12 +229,17 @@
 </head>
 <body>
 
+    <!-- 8-Bit Arcade Curtains -->
+    <div class="curtain left"></div>
+    <div class="curtain right"></div>
+
     <div class="main-layout">
-        <!-- Left Column: Player & Controls -->
+        <!-- Player & Controls Section -->
         <div class="player-section">
             <div class="now-playing-banner">
                 <div class="now-playing-info">
                     <span class="label">Now Playing</span>
+                    <span id="current-playlist-name" class="playlist-name">Playlist: --</span>
                     <span id="current-song-title" class="title">Waiting for playback to begin...</span>
                 </div>
                 <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">Skip ⏭️</button>
@@ -242,20 +254,12 @@
             </div>
 
             <div class="control-panel">
-                <p class="helper-text">Paste your Playlist URLs (one per line):</p>
-                <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
                 <div class="button-row">
                     <span id="status-display" class="helper-text">Ready.</span>
-                    <button onclick="initJukebox()">Start Jukebox 🔀</button>
+                    <button onclick="initJukebox()">Go Go Radio!</button>
                 </div>
-            </div>
-        </div>
-
-        <!-- Right Column: Interactive Queue Manager -->
-        <div class="text-log-section">
-            <h3>Playlist Pool Status</h3>
-            <div id="playlist-queue-list">
-                <span style="color: #666; text-align: center; margin-top: 40px;">No playlists loaded yet.</span>
+                <p class="helper-text">Paste your Playlist URLs (one per line):</p>
+                <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
             </div>
         </div>
     </div>
@@ -314,7 +318,6 @@
             masterTrackPool = [];
             currentPlaylistIndex = 0;
             
-            // Mute the player globally during the hidden indexing phase
             if (player && typeof player.mute === 'function') {
                 player.mute();
             }
@@ -345,8 +348,17 @@
         function harvestTracksFromCurrentPlayer() {
             try {
                 const fetchedTracks = player.getPlaylist();
+                const activePlaylistId = playlistPool[currentPlaylistIndex];
+                const activeIndexNum = currentPlaylistIndex + 1;
+
                 if (fetchedTracks && Array.isArray(fetchedTracks)) {
-                    masterTrackPool.push(...fetchedTracks);
+                    fetchedTracks.forEach(vId => {
+                        masterTrackPool.push({
+                            videoId: vId,
+                            playlistId: activePlaylistId,
+                            playlistDisplayNum: activeIndexNum
+                        });
+                    });
                 }
             } catch (e) {
                 console.log('Error harvesting playlist:', e);
@@ -361,10 +373,13 @@
         }
 
         function FINALIZE_INDEXING() {
-            masterTrackPool = [...new Set(masterTrackPool)];
-            renderQueueUI();
+            const seen = new Set();
+            masterTrackPool = masterTrackPool.filter(item => {
+                if (seen.has(item.videoId)) return false;
+                seen.add(item.videoId);
+                return true;
+            });
             
-            // Unmute the player before launching the first active track
             if (player && typeof player.unMute === 'function') {
                 player.unMute();
             }
@@ -382,11 +397,12 @@
             if (!isJukeboxActive || masterTrackPool.length === 0) return;
 
             const randomIndex = Math.floor(Math.random() * masterTrackPool.length);
-            const targetVideoId = masterTrackPool[randomIndex];
+            const targetTrack = masterTrackPool[randomIndex];
 
             document.getElementById('status-display').innerText = `Active mix (${masterTrackPool.length} tracks)`;
-            player.loadVideoById(targetVideoId);
+            document.getElementById('current-playlist-name').innerText = `Playlist #${targetTrack.playlistDisplayNum} (${targetTrack.playlistId})`;
 
+            player.loadVideoById(targetTrack.videoId);
             fetchVideoTitle();
         }
 
@@ -413,20 +429,6 @@
             if (event.data === YT.PlayerState.ENDED && isJukeboxActive) {
                 playRandomMasterTrack();
             }
-        }
-
-        function renderQueueUI() {
-            const container = document.getElementById('playlist-queue-list');
-            let html = `<strong>Indexed Playlists:</strong> ${playlistPool.length}<br><strong>Total Songs Found:</strong> ${masterTrackPool.length}<br><hr style="border-color:#333; margin:8px 0;">`;
-            
-            playlistPool.forEach((id, idx) => {
-                html += `
-                    <div class="queue-item">
-                        <span title="${id}">#${idx + 1}: ${id}</span>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
         }
     </script>
 
