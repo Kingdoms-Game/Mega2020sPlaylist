@@ -175,6 +175,16 @@
             border-radius: 12px;
             border: 1px solid #333;
             box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+        .control-panel.collapsed {
+            padding: 12px 20px;
+        }
+        .control-panel.collapsed #input-container {
+            display: none;
+        }
+        .control-panel.collapsed .helper-text {
+            display: none;
         }
         textarea {
             width: 100%;
@@ -223,7 +233,7 @@
         }
         .helper-text {
             font-size: 13px;
-            color: #888;
+            color: #bbb;
             margin: 0;
         }
     </style>
@@ -243,7 +253,7 @@
                     <span id="current-playlist-name" class="playlist-name">Playlist: --</span>
                     <span id="current-song-title" class="title">Waiting for playback to begin...</span>
                 </div>
-                <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">Skip ⏭️</button>
+                <button class="secondary" onclick="playRandomMasterTrack()" title="Skip to a random track">Next ▶▶</button>
             </div>
 
             <div id="player-container">
@@ -254,13 +264,15 @@
                 <div id="youtube-player"></div>
             </div>
 
-            <div class="control-panel">
+            <div id="control-panel" class="control-panel">
                 <div class="button-row">
                     <span id="status-display" class="helper-text">Ready.</span>
                     <button onclick="initJukebox()">Go Go Radio!</button>
                 </div>
-                <p class="helper-text">Paste your Playlist URLs (one per line):</p>
-                <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
+                <div id="input-container">
+                    <p class="helper-text">Paste your Playlist URLs (one per line):</p>
+                    <textarea id="playlist-input" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxxx...&#10;https://www.youtube.com/playlist?list=PLyyyyyyyy..."></textarea>
+                </div>
             </div>
         </div>
     </div>
@@ -275,6 +287,7 @@
         let currentPlaylistIndex = 0;
         let isJukeboxActive = false;
         let titleInterval = null;
+        let playlistNamesMap = {};
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-player', {
@@ -308,7 +321,6 @@
         document.getElementById('playlist-input').addEventListener('paste', function(e) {
             setTimeout(() => {
                 let val = this.value;
-                // Clean up spacing and ensure each URL or list string gets its own newline
                 let cleaned = val.split(/[\r\n]+/)
                                  .map(line => line.trim())
                                  .filter(Boolean)
@@ -335,6 +347,7 @@
             isJukeboxActive = true;
             masterTrackPool = [];
             currentPlaylistIndex = 0;
+            playlistNamesMap = {};
             
             if (player && typeof player.mute === 'function') {
                 player.mute();
@@ -367,9 +380,8 @@
             try {
                 const fetchedTracks = player.getPlaylist();
                 const activePlaylistId = playlistPool[currentPlaylistIndex];
-                let playlistTitle = `Playlist #${currentPlaylistIndex + 1}`;
+                let playlistTitle = `Playlist ${currentPlaylistIndex + 1}`;
 
-                // Attempt to grab the actual YouTube playlist name if exposed by the player API
                 try {
                     const data = player.getVideoData();
                     if (data && data.listTitle && data.listTitle !== "") {
@@ -377,11 +389,12 @@
                     }
                 } catch(err) {}
 
+                playlistNamesMap[activePlaylistId] = playlistTitle;
+
                 if (fetchedTracks && Array.isArray(fetchedTracks)) {
                     fetchedTracks.forEach(vId => {
                         masterTrackPool.push({
                             videoId: vId,
-                            playlistName: playlistTitle,
                             playlistId: activePlaylistId
                         });
                     });
@@ -413,6 +426,8 @@
             document.getElementById('loading-overlay').classList.add('hidden');
             
             if (masterTrackPool.length > 0) {
+                // Fold up the URL input box
+                document.getElementById('control-panel').classList.add('collapsed');
                 playRandomMasterTrack();
             } else {
                 alert('Could not index tracks. Make sure the playlist links are public.');
@@ -425,8 +440,10 @@
             const randomIndex = Math.floor(Math.random() * masterTrackPool.length);
             const targetTrack = masterTrackPool[randomIndex];
 
-            document.getElementById('status-display').innerText = `Active mix (${masterTrackPool.length} tracks)`;
-            document.getElementById('current-playlist-name').innerText = targetTrack.playlistName;
+            document.getElementById('status-display').innerText = `Tracks: ${masterTrackPool.length}`;
+            
+            let resolvedName = playlistNamesMap[targetTrack.playlistId] || 'Unknown Playlist';
+            document.getElementById('current-playlist-name').innerText = resolvedName;
 
             player.loadVideoById(targetTrack.videoId);
             fetchVideoTitle();
@@ -442,8 +459,8 @@
                     const data = player.getVideoData();
                     if (data && data.title && data.title !== "") {
                         document.getElementById('current-song-title').innerText = data.title;
-                        // Grab playlist title here as a secondary fallback if it loaded late
                         if (data.listTitle && data.listTitle !== "") {
+                            playlistNamesMap[playlistPool[currentPlaylistIndex - 1] || playlistPool[0]] = data.listTitle;
                             document.getElementById('current-playlist-name').innerText = data.listTitle;
                         }
                         clearInterval(titleInterval);
