@@ -78,7 +78,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 14px;
+            gap: 12px;
             z-index: 10;
             transition: opacity 0.4s ease;
         }
@@ -87,7 +87,7 @@
             pointer-events: none;
         }
         .loading-text {
-            font-size: 14px;
+            font-size: 13px;
             color: #aaa;
             font-family: monospace;
         }
@@ -96,7 +96,7 @@
         .progress-track {
             width: 220px;
             height: 12px;
-            background: #2b0b0e; /* Deep arcade maroon/red-ish box */
+            background: #2b0b0e;
             border: 2px solid #5c1d24;
             border-radius: 4px;
             overflow: hidden;
@@ -105,7 +105,7 @@
         .progress-fill {
             width: 0%;
             height: 100%;
-            background-color: #2ecc71; /* Button-matching green */
+            background-color: #2ecc71;
             transition: width 0.3s ease;
         }
         
@@ -155,7 +155,7 @@
 
         <div id="player-container">
             <div id="loading-overlay" class="hidden">
-                <span id="overlay-status" class="loading-text">Indexing playlists...</span>
+                <span id="overlay-status" class="loading-text">Loading...</span>
                 <div class="progress-track">
                     <div id="progress-bar-fill" class="progress-fill"></div>
                 </div>
@@ -244,7 +244,7 @@
 
         async function initJukebox() {
             let targetPlaylists = [];
-            let loadingMessage = isMGMode ? "Loading Radio M.Gorille..." : "Loading Your Playlists...";
+            let modeTitle = isMGMode ? "Loading Radio M.Gorille" : "Loading Your Playlists";
 
             if (isMGMode) {
                 targetPlaylists = mgPlaylists;
@@ -276,16 +276,31 @@
 
             const overlay = document.getElementById('loading-overlay');
             const fillBar = document.getElementById('progress-bar-fill');
+            const statusLabel = document.getElementById('overlay-status');
             
             overlay.classList.remove('hidden');
             fillBar.style.width = '0%';
-            document.getElementById('overlay-status').innerText = loadingMessage;
-            document.getElementById('status-display').innerText = loadingMessage;
+
+            // Set initial label based on mode (numbers for user playlists, clean text for Radio M.Gorille)
+            if (isMGMode) {
+                statusLabel.innerText = `${modeTitle}...`;
+            } else {
+                statusLabel.innerText = `${modeTitle}... (0/${targetPlaylists.length})`;
+            }
+            document.getElementById('status-display').innerText = `${modeTitle}...`;
 
             for (let i = 0; i < targetPlaylists.length; i++) {
-                let percent = Math.round(((i + 1) / targetPlaylists.length) * 100);
+                let currentCount = i + 1;
+                let percent = Math.round((currentCount / targetPlaylists.length) * 100);
+                
                 fillBar.style.width = percent + '%';
-                document.getElementById('overlay-status').innerText = `${loadingMessage} (${i + 1}/${targetPlaylists.length})`;
+                
+                // Update text dynamically per mode
+                if (isMGMode) {
+                    statusLabel.innerText = `${modeTitle}...`;
+                } else {
+                    statusLabel.innerText = `${modeTitle}... (${currentCount}/${targetPlaylists.length})`;
+                }
                 
                 player.loadPlaylist({list: targetPlaylists[i], listType: 'playlist', index: 0});
                 await new Promise(r => setTimeout(r, 1500));
