@@ -277,7 +277,7 @@
     <div class="main-layout">
         <div class="now-playing-banner">
             <div class="now-playing-info">
-                <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Now Playing</span><br>
+                <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Now Playing<span id="now-playing-mode" style="color: #2ecc71;"></span></span><br>
                 <span id="current-song-title" class="title">Waiting for playback to begin...</span>
             </div>
             <button class="secondary" onclick="handleSkipButton()">Next ▶▶</button>
@@ -313,10 +313,9 @@
             <div id="input-container">
                 <p style="font-size: 13px; color: #bbb; margin: 0 0 8px 0;">Paste your Playlist URLs (one per line):</p>
                 <textarea id="playlist-input" wrap="off"></textarea>
+                <button id="mg-toggle" onclick="toggleMGorilleMode()">Radio M.Gorille</button>
             </div>
         </div>
-
-        <button id="mg-toggle" onclick="toggleMGorilleMode()">Radio M.Gorille</button>
     </div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
@@ -347,15 +346,18 @@
                 isMGMode = true;
                 const btn = document.getElementById('mg-toggle');
                 const input = document.getElementById('playlist-input');
+                const modeIndicator = document.getElementById('now-playing-mode');
                 
                 btn.classList.add('active');
                 input.value = "Enjoy!";
                 input.disabled = true;
                 btn.innerText = "Radio M.Gorille: ON";
+                modeIndicator.innerText = ": Radio M.Gorille";
             }
             
             localStorage.removeItem('saved_mg_mode');
 
+            // Set initial hint visibility based on control panel collapsed state
             const panel = document.getElementById('control-panel');
             const hint = document.getElementById('click-hint');
             if (panel.classList.contains('collapsed')) {
@@ -364,6 +366,7 @@
                 hint.style.display = 'none';
             }
 
+            // Intercept paste events to automatically append a newline so the cursor drops down immediately
             const textarea = document.getElementById('playlist-input');
             textarea.addEventListener('paste', (e) => {
                 if (isMGMode) return;
@@ -417,6 +420,7 @@
             isMGMode = !isMGMode;
             const btn = document.getElementById('mg-toggle');
             const input = document.getElementById('playlist-input');
+            const modeIndicator = document.getElementById('now-playing-mode');
             btn.classList.toggle('active');
 
             if (isMGMode) {
@@ -424,25 +428,17 @@
                 input.value = "Enjoy!";
                 input.disabled = true;
                 btn.innerText = "Radio M.Gorille: ON";
+                modeIndicator.innerText = ": Radio M.Gorille";
                 localStorage.setItem('saved_mg_mode', 'true');
-                initJukebox();
             } else {
                 input.disabled = false;
                 input.value = savedUserInput;
                 btn.innerText = "Radio M.Gorille";
+                modeIndicator.innerText = "";
                 localStorage.setItem('saved_mg_mode', 'false');
-
-                // Graceful fallback transition to user-mode without error alerts
-                isJukeboxActive = false;
-                masterTrackPool = [];
-                if (player && typeof player.stopVideo === 'function') {
-                    player.stopVideo();
-                }
-                document.getElementById('current-song-title').innerText = "Waiting for playback to begin...";
-                document.getElementById('status-display').innerText = "Ready.";
-                document.getElementById('tutorial-overlay').classList.remove('hidden');
-                document.getElementById('loading-overlay').classList.add('hidden');
             }
+
+            initJukebox();
         }
 
         function toggleControlPanel() { 
@@ -461,7 +457,12 @@
             let targetPlaylists = [];
             let modeTitle = isMGMode ? "Loading Radio M.Gorille" : "Loading Your Playlists";
 
-            if (!isMGMode) {
+            document.getElementById('current-song-title').innerText = "Loading...";
+
+            if (isMGMode) {
+                targetPlaylists = mgPlaylists;
+                localStorage.setItem('saved_mg_mode', 'true');
+            } else {
                 const rawText = document.getElementById('playlist-input').value;
                 localStorage.setItem('saved_jukebox_playlists', rawText);
                 localStorage.setItem('saved_mg_mode', 'false');
@@ -474,18 +475,14 @@
                     }
                     return i.trim().length > 5 ? i.trim() : null;
                 }).filter(Boolean))];
-
-                if (targetPlaylists.length === 0) {
-                    alert('Please enter at least one valid playlist URL.');
-                    document.getElementById('current-song-title').innerText = "Waiting for playback to begin...";
-                    return;
-                }
-            } else {
-                targetPlaylists = mgPlaylists;
-                localStorage.setItem('saved_mg_mode', 'true');
             }
 
-            document.getElementById('current-song-title').innerText = "Loading...";
+            if (targetPlaylists.length === 0) {
+                alert('Please enter at least one valid playlist URL.');
+                document.getElementById('current-song-title').innerText = "Waiting for playback to begin...";
+                return;
+            }
+
             isJukeboxActive = true;
             masterTrackPool = [];
             
